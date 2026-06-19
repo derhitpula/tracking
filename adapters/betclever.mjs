@@ -4,6 +4,7 @@
 // Es werden nur Tipps des heutigen Tages übernommen (Tagesname im Zeitfeld).
 import { matchAll } from '../lib/parse.mjs';
 import { fetchViaBrowser } from '../lib/browser.mjs';
+import { wallToUtcIso } from '../lib/time.mjs';
 
 export default {
   id: 'betclever',
@@ -36,17 +37,18 @@ export default {
       const home = vs[1].trim();
       const away = vs[2].trim();
 
-      // "Friday 20:00 PM" -> ISO kickoff (PM bereits in 24h-Format angegeben)
+      // "Friday 20:00 PM" -> ISO kickoff (PM bereits in 24h-Format angegeben).
+      // Zeit ist UK-Zeit -> DST-korrekt nach UTC umrechnen.
       const tm = timeStr.match(/(\d{1,2}):(\d{2})\s*(AM|PM)/i);
       let kickoff = null;
       if (tm) {
         let h = parseInt(tm[1]);
         if (/pm/i.test(tm[3]) && h < 12) h += 12;
         else if (/am/i.test(tm[3]) && h === 12) h = 0;
-        kickoff = `${todayDate}T${String(h).padStart(2, '0')}:${tm[2]}:00Z`;
+        kickoff = wallToUtcIso(todayDate, `${String(h).padStart(2, '0')}:${tm[2]}`, 'Europe/London');
       }
 
-      tips.push({ home, away, market_raw: sel, odds, match_date: todayDate, kickoff });
+      tips.push({ home, away, market_raw: sel, odds, match_date: kickoff ? kickoff.slice(0, 10) : todayDate, kickoff });
     }
     return tips;
   },

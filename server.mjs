@@ -16,8 +16,11 @@ const deDate = (iso) => { const m = String(iso ?? '').match(/^(\d{4})-(\d{2})-(\
 // kickoffs ohne Zeitzonen-Marker werden als UTC interpretiert (Z anhängen).
 const kickoffTime = (iso) => {
   if (!iso) return '';
-  let s = String(iso);
-  if (/T\d{2}:\d{2}/.test(s) && !/[Zz]|[+-]\d{2}:?\d{2}$/.test(s)) s += 'Z';
+  let s = String(iso).trim();
+  // "YYYY-MM-DD HH:MM:SS" (Leerzeichen statt T) -> ISO-Form
+  s = s.replace(/^(\d{4}-\d{2}-\d{2}) (\d{2}:\d{2})/, '$1T$2');
+  // ohne Zeitzonen-Marker als UTC interpretieren
+  if (/\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/.test(s) && !/[Zz]|[+-]\d{2}:?\d{2}$/.test(s)) s += 'Z';
   const d = new Date(s);
   if (isNaN(d)) return '';
   return d.toLocaleTimeString('de-DE', { timeZone: 'Europe/Berlin', hour: '2-digit', minute: '2-digit' });
