@@ -96,5 +96,5 @@ export function startServer(port = 8080) {
 
 // Direktstart: node server.mjs
 if (import.meta.url === `file://${process.argv[1]}` || process.argv[1]?.endsWith('server.mjs')) {
-  startServer(Number(process.env.PORT) || 8080);
+  startServer(Number(process.env.PORT || process.env.DASHBOARD_PORT) || 8080);
 }

@@ -12,6 +12,7 @@
 //   node track.mjs list [--source x] [--date YYYY-MM-DD] [--pending]
 //   node track.mjs sources            verfügbare Quellen anzeigen
 // -----------------------------------------------------------------------------
+import './lib/env.mjs'; // .env laden (für nativen Betrieb ohne Docker)
 import { openDb, upsertTip, dayOf, nowIso } from './lib/db.mjs';
 import { fetchHtml, sleep } from './lib/fetch.mjs';
 import { normalizeMarket, evalTip, tipLabel } from './lib/markets.mjs';

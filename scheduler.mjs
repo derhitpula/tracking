@@ -1,5 +1,6 @@
 // Dauerlauf-Scheduler für den VPS: sammelt periodisch Tipps, holt Ergebnisse
 // und betreibt das Dashboard. Ersetzt host-seitiges cron – läuft im Container.
+import './lib/env.mjs'; // .env laden (für nativen Betrieb ohne Docker)
 import { spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
@@ -9,7 +10,8 @@ const DIR = dirname(fileURLToPath(import.meta.url));
 const H = 3600 * 1000;
 const COLLECT_EVERY = (Number(process.env.COLLECT_EVERY_HOURS) || 6) * H;
 const RESULTS_EVERY = (Number(process.env.RESULTS_EVERY_HOURS) || 1) * H;
-const PORT = Number(process.env.PORT) || 8080;
+// Docker setzt PORT=8080 (intern fix); nativ greift DASHBOARD_PORT aus .env.
+const PORT = Number(process.env.PORT || process.env.DASHBOARD_PORT) || 8080;
 
 const ts = () => new Date().toISOString().replace('T', ' ').slice(0, 19);
 

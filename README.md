@@ -103,6 +103,25 @@ Die Daten liegen im gemounteten Ordner `./data` und bleiben über Updates/Reboot
 
 Windows-VPS mit Docker Desktop: `./install.ps1` (PowerShell).
 
+### Windows-VPS ohne Docker (nativ, empfohlen für Windows)
+
+Auf einem Windows-VPS am einfachsten ganz ohne Docker – läuft als Autostart-Aufgabe,
+Dashboard rufst du direkt im Browser **auf dem VPS** auf (kein SSH-Tunnel nötig).
+
+1. **Node.js LTS** installieren (≥ 22): <https://nodejs.org>
+2. Projektordner auf den VPS kopieren (per Remotedesktop reinkopieren oder `git clone`).
+3. Im Ordner – Rechtsklick auf `install-windows.ps1` ▸ **„Mit PowerShell ausführen"**
+   (fragt den API-Football-Key ab und registriert die Autostart-Aufgabe `TippTracker`).
+4. **Dashboard:** im Browser auf dem VPS `http://localhost:8080` öffnen.
+
+Steuern (PowerShell auf dem VPS):
+- Report: `node track.mjs report`
+- Log: `data\scheduler.log`
+- Stoppen: `Stop-ScheduledTask -TaskName TippTracker`
+- Entfernen: `Unregister-ScheduledTask -TaskName TippTracker -Confirm:$false`
+
+`.env` wird auch nativ gelesen (Key, `ENABLE_DASHBOARD`, `DASHBOARD_PORT`, Intervalle).
+
 ## Automatisch laufen lassen (Windows, ohne Docker)
 
 ```powershell
