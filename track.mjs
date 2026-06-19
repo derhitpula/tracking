@@ -122,6 +122,29 @@ async function fillOdds() {
   db.close();
 }
 
+// --- kickoff: fehlende Anstoßzeiten per API-Football nachfüllen --------------
+async function fillKickoff() {
+  const db = openDb();
+  const open = db.prepare(`SELECT * FROM tips WHERE kickoff IS NULL AND match_date IS NOT NULL ORDER BY match_date, source`).all();
+  if (!open.length) { console.log('Keine Tipps ohne Anstoßzeit.'); db.close(); return; }
+  const upd = db.prepare('UPDATE tips SET kickoff=? WHERE id=?');
+  const fxCache = new Map();
+  let done = 0, miss = 0;
+  console.log(`Hole Anstoßzeiten für ${open.length} Tipp(s) …\n`);
+  for (const t of open) {
+    const ck = `${t.match_date}|${t.home}|${t.away}`;
+    let fx = fxCache.get(ck);
+    if (fx === undefined) { fx = await findApiFixture(t.home, t.away, t.match_date); fxCache.set(ck, fx); }
+    if (!fx?.kickoff) { console.log(`  ? [${t.source}] ${t.home} vs ${t.away}: kein Fixture`); miss++; continue; }
+    upd.run(fx.kickoff, t.id);
+    console.log(`  ✓ [${t.source}] ${t.home} vs ${t.away}: ${fx.kickoff}`);
+    done++;
+    await sleep(200);
+  }
+  console.log(`\nFertig: ${done} Anstoßzeiten gesetzt, ${miss} ohne.`);
+  db.close();
+}
+
 // --- report -----------------------------------------------------------------
 const pct = (n, d) => (d ? `${(100 * n / d).toFixed(1)}%` : '–');
 const signed = (n) => (n >= 0 ? '+' : '') + n.toFixed(2);
@@ -208,10 +231,11 @@ try {
     case 'prefetch': await prefetchBetmonitor(); console.log('Betmonitor gecacht.'); break;
     case 'odds': await fillOdds(); break;
     case 'results': await results(); break;
+    case 'kickoff': await fillKickoff(); break;
     case 'update': await collect(args[0]); await fillOdds(); await results(); break;
     case 'report': report(); break;
     case 'list': list(args); break;
     case 'sources': sources(); break;
-    default: console.log('Befehle: collect | odds | results | update | report | list | sources');
+    default: console.log('Befehle: collect | kickoff | odds | results | update | report | list | sources');
   }
 } catch (e) { console.error('Fehler:', e.message); process.exit(1); }
