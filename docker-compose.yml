@@ -8,6 +8,7 @@ services:
     environment:
       - TZ=${TZ:-Europe/Berlin}
     ports:
-      - "${DASHBOARD_PORT:-8080}:8080"
+      # nur an localhost gebunden -> Zugriff ausschließlich über Caddy (Reverse Proxy)
+      - "127.0.0.1:${DASHBOARD_PORT:-8080}:8080"
     volumes:
       - ./data:/app/data             # DB & Ergebnis-Cache bleiben erhalten

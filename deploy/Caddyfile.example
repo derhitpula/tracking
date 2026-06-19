@@ -1,0 +1,27 @@
+# --- Tipp-Tracker Dashboard hinter Caddy -------------------------------------
+# Den Block in deinen bestehenden /etc/caddy/Caddyfile einfügen und Domain anpassen.
+# Caddy holt das TLS-Zertifikat automatisch. Das Dashboard ist nur über localhost:8080
+# erreichbar (so in docker-compose.yml gebunden) – Caddy proxyt davor.
+
+# Variante A: eigene Subdomain (empfohlen)
+tipps.deine-domain.de {
+    encode gzip
+
+    # optional, aber empfohlen: Passwortschutz
+    # Hash erzeugen mit:  caddy hash-password
+    basic_auth {
+        paul DEIN_BCRYPT_HASH_HIER
+    }
+
+    reverse_proxy 127.0.0.1:8080
+}
+
+# --- Variante B: Unterpfad auf bestehender Domain ----------------------------
+# Falls keine Subdomain: innerhalb deines vorhandenen Site-Blocks ergänzen.
+#
+# deine-domain.de {
+#     handle_path /tipps* {
+#         reverse_proxy 127.0.0.1:8080
+#     }
+#     # ... dein bestehender App-Proxy (Port 8000) bleibt unverändert ...
+# }
