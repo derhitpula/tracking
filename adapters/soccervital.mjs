@@ -2,7 +2,12 @@
 // Markup: <tr class="twom">...<timegame>HH:MM</a>...<hometeam>X</div>...<awayteam>Y</div>
 //         ...<center260>N on Team (1.XX)</td>...</tr>
 // N = Konfidenz (1-10), "on Team" = Tipp-Richtung, (odds) = Dezimalquote.
+// Zeiten sind UK-Zeit (Europe/London) -> nach UTC umrechnen. Spiele vor 06:00
+// finden nach Mitternacht statt und gehören zum nächsten Kalendertag.
 import { matchAll, parseOdds } from '../lib/parse.mjs';
+import { wallToUtcIso, todayInTz, addDays } from '../lib/time.mjs';
+
+const TZ = 'Europe/London';
 
 export default {
   id: 'soccervital',
@@ -10,7 +15,7 @@ export default {
   url: 'https://www.soccervital.com/bet/',
   parse(html) {
     const tips = [];
-    const today = new Date().toISOString().slice(0, 10);
+    const base = todayInTz(TZ); // "today" der Seite = heutiger Tag in UK
 
     for (const m of matchAll(html, /<tr class="twom"[^>]*>(.*?)<\/tr>/gs)) {
       const row = m[1];
@@ -38,8 +43,15 @@ export default {
         market_raw = picked; // Fallback: Rohtext
       }
 
-      const kickoff = time ? `${today}T${time.padStart(5, '0')}:00Z` : null;
-      tips.push({ home, away, market_raw, odds, match_date: today, kickoff });
+      // UK-Wandzeit -> UTC. Spiele vor 06:00 laufen nach Mitternacht -> Folgetag.
+      let kickoff = null, match_date = base;
+      if (time) {
+        const hh = parseInt(time, 10);
+        const dateStr = hh < 6 ? addDays(base, 1) : base;
+        kickoff = wallToUtcIso(dateStr, time, TZ);
+        match_date = kickoff.slice(0, 10); // UTC-Tag des Anstoßes
+      }
+      tips.push({ home, away, market_raw, odds, match_date, kickoff });
     }
     return tips;
   },
