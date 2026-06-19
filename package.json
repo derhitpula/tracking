@@ -5,6 +5,9 @@
   "type": "module",
   "description": "Multi-Source Fußball-Tipp-Tracker (Sammeln + Auswerten)",
   "engines": { "node": ">=22.5" },
+  "optionalDependencies": {
+    "playwright": "^1.47.0"
+  },
   "scripts": {
     "collect": "node track.mjs collect",
     "results": "node track.mjs results",
