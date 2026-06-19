@@ -47,7 +47,11 @@ async function collect(sourceFilter) {
         });
         n++;
       }
-      console.log(`${n} Tipp(s)`);
+      if (n === 0 && process.env.DEBUG_COLLECT) {
+        console.log(`0 Tipp(s)  ← HTML-Anfang: ${html.slice(0, 300).replace(/\s+/g, ' ')}`);
+      } else {
+        console.log(`${n} Tipp(s)`);
+      }
     } catch (e) { console.log(`FEHLER: ${e.message}`); }
     await sleep(600);
   }
