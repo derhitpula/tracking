@@ -18,7 +18,7 @@ import { fetchHtml, sleep } from './lib/fetch.mjs';
 import { normalizeMarket, evalTip, tipLabel } from './lib/markets.mjs';
 import { toUnits, aggregate, marketStats } from './lib/stats.mjs';
 import { today } from './lib/parse.mjs';
-import { resolveResult, findApiFixture } from './lib/results.mjs';
+import { resolveResult, findApiFixture, findKickoff } from './lib/results.mjs';
 import { referenceOdds, referenceOddsFallback } from './lib/odds.mjs';
 import { prefetchToday as prefetchBetmonitor } from './lib/betmonitor.mjs';
 import { ADAPTERS } from './adapters/index.mjs';
@@ -128,16 +128,16 @@ async function fillKickoff() {
   const open = db.prepare(`SELECT * FROM tips WHERE kickoff IS NULL AND match_date IS NOT NULL ORDER BY match_date, source`).all();
   if (!open.length) { console.log('Keine Tipps ohne Anstoßzeit.'); db.close(); return; }
   const upd = db.prepare('UPDATE tips SET kickoff=? WHERE id=?');
-  const fxCache = new Map();
+  const koCache = new Map();
   let done = 0, miss = 0;
   console.log(`Hole Anstoßzeiten für ${open.length} Tipp(s) …\n`);
   for (const t of open) {
     const ck = `${t.match_date}|${t.home}|${t.away}`;
-    let fx = fxCache.get(ck);
-    if (fx === undefined) { fx = await findApiFixture(t.home, t.away, t.match_date); fxCache.set(ck, fx); }
-    if (!fx?.kickoff) { console.log(`  ? [${t.source}] ${t.home} vs ${t.away}: kein Fixture`); miss++; continue; }
-    upd.run(fx.kickoff, t.id);
-    console.log(`  ✓ [${t.source}] ${t.home} vs ${t.away}: ${fx.kickoff}`);
+    let ko = koCache.get(ck);
+    if (ko === undefined) { ko = await findKickoff(t.home, t.away, t.match_date); koCache.set(ck, ko); }
+    if (!ko) { console.log(`  ? [${t.source}] ${t.home} vs ${t.away}: kein Fixture`); miss++; continue; }
+    upd.run(ko, t.id);
+    console.log(`  ✓ [${t.source}] ${t.home} vs ${t.away}: ${ko}`);
     done++;
     await sleep(200);
   }
