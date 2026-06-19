@@ -74,21 +74,34 @@ cd marktanal
 Das war's. Der Container läuft dauerhaft (`restart: unless-stopped`, also auch
 nach Reboot), sammelt automatisch (Default alle 6 h) und holt Ergebnisse (alle 1 h).
 
-**Headless – kein Web-Zugang, keine URL, kein offener Port** (Standard):
-- **Report im Terminal:** `docker compose exec tracker node track.mjs report`
-- **Tipps auflisten:** `docker compose exec tracker node track.mjs list`
+### Privates Dashboard (nur für dich, keine öffentliche URL)
+
+Das Dashboard läuft, ist aber **nur an `127.0.0.1` des VPS** gebunden – also nicht
+aus dem Internet erreichbar, keine Domain, kein Caddy. Zugriff per **SSH-Tunnel**:
+
+```bash
+# auf deinem lokalen Rechner:
+ssh -L 8080:127.0.0.1:8080 user@2.56.98.246
+# dann im lokalen Browser öffnen:
+#   http://localhost:8080
+```
+
+Solange der SSH-Tunnel offen ist, siehst du das Dashboard wie lokal; schließt du
+ihn, ist es von außen unsichtbar. (Windows: PuTTY → Connection ▸ SSH ▸ Tunnels,
+Source `8080`, Destination `127.0.0.1:8080`.)
+
+Alternativ ganz ohne Browser – direkt im Terminal:
+- **Report:** `docker compose exec tracker node track.mjs report`
+- **Tipps:** `docker compose exec tracker node track.mjs list`
 - **Logs:** `docker compose logs -f`
 - **Stoppen / Updaten:** `docker compose down` · `docker compose up -d --build`
 
 Konfiguration über `.env` (aus `.env.example`):
-`APIFOOTBALL_KEY`, `TZ`, `COLLECT_EVERY_HOURS`, `RESULTS_EVERY_HOURS`.
+`APIFOOTBALL_KEY`, `ENABLE_DASHBOARD`, `DASHBOARD_PORT`, `TZ`,
+`COLLECT_EVERY_HOURS`, `RESULTS_EVERY_HOURS`.
 Die Daten liegen im gemounteten Ordner `./data` und bleiben über Updates/Reboots erhalten.
 
 Windows-VPS mit Docker Desktop: `./install.ps1` (PowerShell).
-
-**Optionales Web-Dashboard** (nur falls gewünscht): in `.env` `ENABLE_DASHBOARD=true`
-setzen und in `docker-compose.yml` die `ports`-Zeile einkommentieren (an `127.0.0.1`
-gebunden → davor ein Reverse Proxy wie Caddy, siehe `deploy/Caddyfile.example`).
 
 ## Automatisch laufen lassen (Windows, ohne Docker)
 

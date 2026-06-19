@@ -7,10 +7,9 @@ services:
     env_file: .env
     environment:
       - TZ=${TZ:-Europe/Berlin}
-    # Headless: KEINE Port-Freigabe, kein Web-Zugang.
-    # Dashboard nur bei Bedarf: ENABLE_DASHBOARD=true in .env setzen UND die
-    # folgende Zeile einkommentieren (an localhost gebunden, z. B. für Caddy):
-    # ports:
-    #   - "127.0.0.1:${DASHBOARD_PORT:-8080}:8080"
+    ports:
+      # PRIVAT: nur an localhost des VPS gebunden -> NICHT öffentlich erreichbar.
+      # Zugriff ausschließlich per SSH-Tunnel (siehe README). Kein Caddy/keine Domain.
+      - "127.0.0.1:${DASHBOARD_PORT:-8080}:8080"
     volumes:
       - ./data:/app/data             # DB & Ergebnis-Cache bleiben erhalten
