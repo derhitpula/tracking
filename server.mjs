@@ -323,7 +323,8 @@ function html() {
   // Kombis (BetMines Daily Double/Risk etc.)
   const comboRows = combos.map((c) => {
     const legs = c.legs.map((l) => `<span class="leg">${esc(l.home)} / ${esc(l.away)} · <b>${esc(tipLabel(l.market || l.market_raw))}</b></span>`).join('<span class="plus">+</span>');
-    return `<tr><td class="nowrap">${deDate(c.match_date)}</td><td>${srcBadge(c.source)}</td>` +
+    const ckt = kickoffTime(c.kickoff);
+    return `<tr><td class="nowrap">${deDate(c.match_date)}${ckt ? `<br><span class="kt">${ckt}</span>` : ''}</td><td>${srcBadge(c.source)}</td>` +
       `<td><span class="badge type">${esc(c.slip_type)}</span></td><td class="legs">${legs}</td>` +
       `<td class="odd">${c.odds ?? ''}</td><td>${pill(c.result)}</td></tr>`;
   }).join('');
