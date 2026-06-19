@@ -90,15 +90,15 @@ function html() {
 <meta http-equiv="refresh" content="300">
 <title>Tipp-Tracker</title><style>
 :root{
-  /* Bet365-Look: tiefes Grün + gelbe Akzente */
-  --bg:#0a3d2c; --bg2:#0c4733; --panel:#0e5039; --panel2:#117045; --line:#1c6e50;
-  --txt:#eafff5; --muted:#8fc3ad; --accent:#ffdf1b; --accent2:#14805e;
-  --green:#2fe08a; --red:#ff6b6b; --amber:#ffdf1b; --grey:#6f9586;
+  /* Bet365-Look: sehr dunkles Grün + gelbe Akzente */
+  --bg:#04140d; --bg2:#061b12; --panel:#082318; --panel2:#0b3122; --line:#13402d;
+  --txt:#eafff5; --muted:#79a892; --accent:#ffdf1b; --accent2:#0f5e42;
+  --green:#2fe08a; --red:#ff6b6b; --amber:#ffdf1b; --grey:#5f8473;
   color-scheme:dark;
 }
 *{box-sizing:border-box}
 body{font:14px/1.55 -apple-system,BlinkMacSystemFont,"Segoe UI",system-ui,sans-serif;margin:0;
-  background:radial-gradient(1200px 600px at 50% -200px,#14805e 0,var(--bg) 55%);color:var(--txt);min-height:100vh}
+  background:radial-gradient(1200px 600px at 50% -200px,#0d4a33 0,var(--bg) 55%);color:var(--txt);min-height:100vh}
 .wrap{max-width:1080px;margin:0 auto;padding:28px 20px 60px}
 header{display:flex;align-items:flex-end;justify-content:space-between;gap:16px;flex-wrap:wrap;margin-bottom:6px}
 h1{font-size:24px;font-weight:800;margin:0;letter-spacing:-.02em;display:flex;align-items:center;gap:10px}
