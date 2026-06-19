@@ -20,12 +20,15 @@ import { toUnits, aggregate, marketStats } from './lib/stats.mjs';
 import { today } from './lib/parse.mjs';
 import { resolveResult, findApiFixture } from './lib/results.mjs';
 import { referenceOdds, referenceOddsFallback } from './lib/odds.mjs';
+import { prefetchToday as prefetchBetmonitor } from './lib/betmonitor.mjs';
 import { ADAPTERS } from './adapters/index.mjs';
 
 const byId = (id) => ADAPTERS.find((a) => a.id === id);
 
 // --- collect ----------------------------------------------------------------
 async function collect(sourceFilter) {
+  // Betmonitor-Cache sofort befüllen bevor Spiele starten (verschwindet nach Ankick)
+  prefetchBetmonitor().catch(() => {});
   const db = openDb();
   const list = sourceFilter ? [byId(sourceFilter)].filter(Boolean) : ADAPTERS;
   if (!list.length) { console.log(`Unbekannte Quelle: ${sourceFilter}`); db.close(); return; }
