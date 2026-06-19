@@ -8,15 +8,42 @@ import { toUnits, aggregate, marketStats } from './lib/stats.mjs';
 const pct = (n, d) => (d ? `${(100 * n / d).toFixed(1)}%` : '–');
 const signed = (n) => (n >= 0 ? '+' : '') + n.toFixed(2);
 const roiOf = (s) => (s.stake ? signed(100 * (s.ret - s.stake) / s.stake) + '%' : '–');
+const roiNum = (s) => (s.stake ? 100 * (s.ret - s.stake) / s.stake : null);
 const esc = (s) => String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 // YYYY-MM-DD -> TT.MM.JJJJ (deutsches Datumsformat)
 const deDate = (iso) => { const m = String(iso ?? '').match(/^(\d{4})-(\d{2})-(\d{2})/); return m ? `${m[3]}.${m[2]}.${m[1]}` : (iso ?? '?'); };
 
-function row(name, s) {
+// Stabile Farbe je Quelle (HSL aus Namens-Hash)
+function srcColor(name) {
+  let h = 0; for (let i = 0; i < name.length; i++) h = (h * 31 + name.charCodeAt(i)) % 360;
+  return `hsl(${h} 60% 62%)`;
+}
+const srcBadge = (name) => `<span class="badge src" style="--c:${srcColor(name)}">${esc(name)}</span>`;
+
+// Ergebnis-Pille
+function pill(r) {
+  const map = { won: ['Gewonnen', 'won'], lost: ['Verloren', 'lost'], void: ['Void', 'void'],
+    pending: ['Offen', 'pending'], unknown: ['?', 'unknown'] };
+  const [label, cls] = map[r] || map.unknown;
+  return `<span class="pill ${cls}">${label}</span>`;
+}
+
+// Trefferquoten-Balken (won/lost)
+function bar(won, lost) {
+  const tot = won + lost;
+  if (!tot) return '<div class="bar"><span class="muted">–</span></div>';
+  const w = (100 * won / tot).toFixed(0);
+  return `<div class="bar"><div class="bar-track"><div class="bar-fill" style="width:${w}%"></div></div>` +
+    `<span class="bar-lbl">${won}/${tot}</span></div>`;
+}
+
+function srcRow(name, s) {
   const st = s.won + s.lost;
-  const cls = s.stake && s.ret - s.stake > 0 ? 'pos' : s.stake && s.ret - s.stake < 0 ? 'neg' : '';
-  return `<tr><td>${esc(name)}</td><td>${s.won}/${st}</td><td>${pct(s.won, st)}</td>` +
-    `<td class="${cls}">${roiOf(s)}</td><td>${s.pending}</td></tr>`;
+  const roi = roiNum(s);
+  const roiCls = roi == null ? 'muted' : roi > 0 ? 'pos' : roi < 0 ? 'neg' : '';
+  return `<tr><td>${srcBadge(name)}</td><td>${bar(s.won, s.lost)}</td>` +
+    `<td>${pct(s.won, st)}</td><td class="${roiCls}">${roiOf(s)}</td>` +
+    `<td><span class="pill pending sm">${s.pending}</span></td></tr>`;
 }
 
 function html() {
@@ -29,60 +56,128 @@ function html() {
   const settled = overall.won + overall.lost + overall.void;
   const dates = rows.map((t) => t.match_date).filter(Boolean).sort();
   const combos = units.filter((u) => u.kind === 'combo');
+  const sources = new Set(rows.map((t) => t.source));
+  const roiAll = roiNum(overall);
 
   // Kombis (BetMines Daily Double/Risk etc.)
   const comboRows = combos.map((c) => {
-    const legs = c.legs.map((l) => `${esc(l.home)}/${esc(l.away)} ${esc(tipLabel(l.market || l.market_raw))}`).join(' + ');
-    return `<tr class="r-${c.result}"><td>${deDate(c.match_date)}</td><td>${esc(c.source)}</td>` +
-      `<td>${esc(c.slip_type)}</td><td>${legs}</td><td>${c.odds ?? ''}</td><td><b>${c.result}</b></td></tr>`;
+    const legs = c.legs.map((l) => `<span class="leg">${esc(l.home)} / ${esc(l.away)} · <b>${esc(tipLabel(l.market || l.market_raw))}</b></span>`).join('<span class="plus">+</span>');
+    return `<tr><td class="nowrap">${deDate(c.match_date)}</td><td>${srcBadge(c.source)}</td>` +
+      `<td><span class="badge type">${esc(c.slip_type)}</span></td><td class="legs">${legs}</td>` +
+      `<td class="odd">${c.odds ?? ''}</td><td>${pill(c.result)}</td></tr>`;
   }).join('');
 
   // Einzeltipps
-  const singles = rows.filter((t) => !t.slip_ref).slice(0, 60).map((t) => {
-    const sc = t.ft_home != null ? ` (${t.ft_home}-${t.ft_away})` : '';
+  const singles = rows.filter((t) => !t.slip_ref).slice(0, 80).map((t) => {
+    const sc = t.ft_home != null ? `<span class="score">${t.ft_home}–${t.ft_away}</span>` : '';
     const r = t.result || 'pending';
-    // Referenzquote (einheitlich) anzeigen; Eigenquote klein dahinter
     const oddCell = t.ref_odds != null
-      ? `<b>${t.ref_odds}</b>${t.odds != null && t.odds !== t.ref_odds ? ` <span style="color:#667">(${t.odds})</span>` : ''}`
-      : (t.odds ?? '–');
-    return `<tr class="r-${r}"><td>${deDate(t.match_date)}</td><td>${esc(t.source)}</td>` +
-      `<td>${esc(t.home)} vs ${esc(t.away)}${sc}</td><td>${esc(t.market_raw || '?')}</td>` +
-      `<td>${oddCell}</td><td><b>${r}</b></td></tr>`;
+      ? `<b class="odd">${t.ref_odds}</b>${t.odds != null && t.odds !== t.ref_odds ? ` <span class="muted own">(${t.odds})</span>` : ''}`
+      : (t.odds != null ? `<span class="odd">${t.odds}</span>` : '<span class="muted">–</span>');
+    return `<tr><td class="nowrap">${deDate(t.match_date)}</td><td>${srcBadge(t.source)}</td>` +
+      `<td class="match">${esc(t.home)} <span class="vs">vs</span> ${esc(t.away)}${sc}</td>` +
+      `<td><span class="tip">${esc(t.market_raw || tipLabel(t.market) || '?')}</span></td>` +
+      `<td>${oddCell}</td><td>${pill(r)}</td></tr>`;
   }).join('');
-  const srcRows = [...bySource].sort((a, b) => (b[1].won + b[1].lost) - (a[1].won + a[1].lost)).map(([k, s]) => row(k, s)).join('');
-  const mkRows = [...byMarket].map(([k, s]) => [k, s]).filter(([, s]) => s.won + s.lost).sort((a, b) => (b[1].won + b[1].lost) - (a[1].won + a[1].lost)).map(([k, s]) => row(k, s)).join('');
+
+  const srcRows = [...bySource].sort((a, b) => (b[1].won + b[1].lost) - (a[1].won + a[1].lost) || b[1].pending - a[1].pending).map(([k, s]) => srcRow(k, s)).join('');
+  const mkRows = [...byMarket].filter(([, s]) => s.won + s.lost).sort((a, b) => (b[1].won + b[1].lost) - (a[1].won + a[1].lost)).map(([k, s]) => srcRow(k, s)).join('');
+
+  const roiCardCls = roiAll == null ? '' : roiAll >= 0 ? 'pos' : 'neg';
 
   return `<!doctype html><html lang="de"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <meta http-equiv="refresh" content="300">
 <title>Tipp-Tracker</title><style>
-:root{color-scheme:dark}body{font:14px/1.5 system-ui,sans-serif;margin:0;background:#0f1115;color:#e6e6e6}
-.wrap{max-width:1000px;margin:0 auto;padding:24px}
-h1{font-size:20px;margin:0 0 4px}h2{font-size:15px;margin:28px 0 8px;color:#9ad}
-.sub{color:#888;font-size:12px}
-.cards{display:flex;gap:12px;flex-wrap:wrap;margin-top:16px}
-.card{background:#181b22;border:1px solid #262b36;border-radius:10px;padding:14px 18px;min-width:120px}
-.card .v{font-size:22px;font-weight:700}.card .l{color:#8a93a6;font-size:12px}
-table{width:100%;border-collapse:collapse;margin-top:6px;background:#161922;border-radius:10px;overflow:hidden}
-th,td{text-align:left;padding:7px 10px;border-bottom:1px solid #232938;font-size:13px}
-th{background:#1d2230;color:#9aa7bd;font-weight:600}
-.pos{color:#4ade80}.neg{color:#f87171}
-.r-won b{color:#4ade80}.r-lost b{color:#f87171}.r-pending b{color:#fbbf24}.r-unknown b{color:#888}
-footer{color:#667;margin-top:24px;font-size:11px}
+:root{
+  --bg:#0b0e14; --bg2:#10141d; --panel:#141925; --panel2:#19202e; --line:#232b3b;
+  --txt:#e8ecf3; --muted:#7c879c; --accent:#5b8cff; --accent2:#9a6bff;
+  --green:#39d98a; --red:#ff6b6b; --amber:#ffc145; --grey:#6b7689;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+body{font:14px/1.55 -apple-system,BlinkMacSystemFont,"Segoe UI",system-ui,sans-serif;margin:0;
+  background:radial-gradient(1200px 600px at 50% -200px,#16203a 0,var(--bg) 60%);color:var(--txt);min-height:100vh}
+.wrap{max-width:1080px;margin:0 auto;padding:28px 20px 60px}
+header{display:flex;align-items:flex-end;justify-content:space-between;gap:16px;flex-wrap:wrap;margin-bottom:6px}
+h1{font-size:24px;font-weight:800;margin:0;letter-spacing:-.02em;display:flex;align-items:center;gap:10px}
+h1 .logo{width:30px;height:30px;display:grid;place-items:center;border-radius:9px;
+  background:linear-gradient(135deg,var(--accent),var(--accent2));font-size:17px;box-shadow:0 4px 14px rgba(91,140,255,.4)}
+h2{font-size:13px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);font-weight:700;margin:34px 0 12px}
+.sub{color:var(--muted);font-size:12.5px;text-align:right}
+.sub b{color:var(--txt);font-weight:600}
+
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:14px;margin-top:20px}
+.card{position:relative;background:linear-gradient(180deg,var(--panel2),var(--panel));border:1px solid var(--line);
+  border-radius:16px;padding:16px 18px;overflow:hidden}
+.card::before{content:"";position:absolute;inset:0 auto 0 0;width:3px;background:var(--accent)}
+.card.pos::before{background:var(--green)}.card.neg::before{background:var(--red)}
+.card .v{font-size:26px;font-weight:800;letter-spacing:-.02em;line-height:1.1}
+.card .l{color:var(--muted);font-size:12px;margin-top:3px;font-weight:500}
+.card.pos .v{color:var(--green)}.card.neg .v{color:var(--red)}
+
+table{width:100%;border-collapse:separate;border-spacing:0;background:var(--panel);
+  border:1px solid var(--line);border-radius:14px;overflow:hidden}
+th,td{text-align:left;padding:11px 14px;border-bottom:1px solid var(--line);font-size:13px;vertical-align:middle}
+tbody tr:last-child td{border-bottom:none}
+th{background:var(--bg2);color:var(--muted);font-weight:600;font-size:11px;text-transform:uppercase;letter-spacing:.05em}
+tbody tr{transition:background .12s}
+tbody tr:hover{background:var(--panel2)}
+.nowrap{white-space:nowrap;color:var(--muted);font-variant-numeric:tabular-nums}
+.muted{color:var(--muted)}.pos{color:var(--green);font-weight:600}.neg{color:var(--red);font-weight:600}
+
+.badge{display:inline-block;padding:2px 9px;border-radius:999px;font-size:11.5px;font-weight:600;white-space:nowrap}
+.badge.src{color:var(--c);background:color-mix(in srgb,var(--c) 16%,transparent);
+  border:1px solid color-mix(in srgb,var(--c) 35%,transparent)}
+.badge.type{color:var(--accent2);background:rgba(154,107,255,.14);border:1px solid rgba(154,107,255,.3);text-transform:capitalize}
+
+.pill{display:inline-block;padding:3px 11px;border-radius:999px;font-size:11.5px;font-weight:700;letter-spacing:.01em}
+.pill.sm{padding:1px 9px;font-weight:600}
+.pill.won{background:rgba(57,217,138,.16);box-shadow:inset 0 0 0 1px rgba(57,217,138,.35);color:var(--green)}
+.pill.lost{color:var(--red);background:rgba(255,107,107,.16);box-shadow:inset 0 0 0 1px rgba(255,107,107,.32)}
+.pill.pending{color:var(--amber);background:rgba(255,193,69,.14);box-shadow:inset 0 0 0 1px rgba(255,193,69,.3)}
+.pill.void,.pill.unknown{color:var(--grey);background:rgba(107,118,137,.16);box-shadow:inset 0 0 0 1px rgba(107,118,137,.3)}
+
+.bar{display:flex;align-items:center;gap:9px;min-width:120px}
+.bar-track{flex:1;height:7px;background:var(--bg2);border-radius:999px;overflow:hidden;min-width:60px}
+.bar-fill{height:100%;background:linear-gradient(90deg,var(--green),#8ef0bf);border-radius:999px}
+.bar-lbl{font-size:12px;color:var(--muted);font-variant-numeric:tabular-nums;white-space:nowrap}
+
+.match{font-weight:500}.match .vs{color:var(--muted);font-size:11px;padding:0 2px}
+.score{margin-left:6px;font-size:11px;color:var(--muted);background:var(--bg2);padding:1px 7px;border-radius:6px;font-weight:600}
+.tip{color:#cdd6e6}
+.odd{font-variant-numeric:tabular-nums;font-weight:700}
+.own{font-weight:500;font-size:12px}
+.legs{font-size:12.5px}.leg{color:#cdd6e6}.leg b{color:var(--txt)}
+.plus{color:var(--accent);font-weight:800;padding:0 7px}
+
+footer{color:var(--muted);margin-top:34px;font-size:11.5px;line-height:1.6;
+  border-top:1px solid var(--line);padding-top:16px}
+.scroll{overflow-x:auto}
 </style></head><body><div class="wrap">
-<h1>⚽ Multi-Source Tipp-Tracker</h1>
-<div class="sub">Zeitraum ${deDate(dates[0])} … ${deDate(dates.at(-1))} · ${rows.length} Selektionen · ${units.length} Wetten (${combos.length} Kombis) · aktualisiert ${new Date().toLocaleString('de-DE')}</div>
+<header>
+  <h1><span class="logo">⚽</span> Tipp-Tracker</h1>
+  <div class="sub">${deDate(dates[0])} – ${deDate(dates.at(-1))} · <b>${sources.size}</b> Quellen · <b>${rows.length}</b> Selektionen · <b>${units.length}</b> Wetten (${combos.length} Kombis)<br>aktualisiert ${new Date().toLocaleString('de-DE')}</div>
+</header>
+
 <div class="cards">
-<div class="card"><div class="v">${overall.won}/${overall.won + overall.lost}</div><div class="l">Treffer (${pct(overall.won, overall.won + overall.lost)})</div></div>
-<div class="card"><div class="v ${overall.stake && overall.ret - overall.stake >= 0 ? 'pos' : 'neg'}">${roiOf(overall)}</div><div class="l">ROI (1u je Wette)</div></div>
-<div class="card"><div class="v">${settled}</div><div class="l">abgerechnet</div></div>
-<div class="card"><div class="v">${overall.pending}</div><div class="l">offen</div></div>
+  <div class="card"><div class="v">${overall.won}<span class="muted" style="font-size:16px">/${overall.won + overall.lost}</span></div><div class="l">Treffer · ${pct(overall.won, overall.won + overall.lost)}</div></div>
+  <div class="card ${roiCardCls}"><div class="v">${roiOf(overall)}</div><div class="l">ROI (1u je Wette)</div></div>
+  <div class="card"><div class="v">${settled}</div><div class="l">abgerechnet</div></div>
+  <div class="card"><div class="v" style="color:var(--amber)">${overall.pending}</div><div class="l">offen</div></div>
 </div>
-<h2>Nach Quelle</h2><table><tr><th>Quelle</th><th>Treffer</th><th>Quote</th><th>ROI</th><th>offen</th></tr>${srcRows}</table>
-${comboRows ? `<h2>Kombis</h2><table><tr><th>Datum</th><th>Quelle</th><th>Typ</th><th>Legs</th><th>Quote</th><th>Ergebnis</th></tr>${comboRows}</table>` : ''}
-${mkRows ? `<h2>Nach Markt (Selektions-Ebene)</h2><table><tr><th>Markt</th><th>Treffer</th><th>Quote</th><th>ROI</th><th>offen</th></tr>${mkRows}</table>` : ''}
-<h2>Einzeltipps</h2><table><tr><th>Datum</th><th>Quelle</th><th>Spiel</th><th>Tipp</th><th>Quote (Ref)</th><th>Ergebnis</th></tr>${singles}</table>
-<footer>ROI = einheitliche Referenzquote (API-Football, Bet365) je Spiel+Markt; Eigenquote der Quelle in Klammern · Auto-Refresh alle 5 Min · nur zu Analysezwecken</footer>
+
+<h2>Nach Quelle</h2>
+<div class="scroll"><table><thead><tr><th>Quelle</th><th>Trefferquote</th><th>Quote</th><th>ROI</th><th>offen</th></tr></thead><tbody>${srcRows}</tbody></table></div>
+
+${comboRows ? `<h2>Kombis</h2><div class="scroll"><table><thead><tr><th>Datum</th><th>Quelle</th><th>Typ</th><th>Legs</th><th>Quote</th><th>Ergebnis</th></tr></thead><tbody>${comboRows}</tbody></table></div>` : ''}
+
+${mkRows ? `<h2>Nach Markt</h2><div class="scroll"><table><thead><tr><th>Markt</th><th>Trefferquote</th><th>Quote</th><th>ROI</th><th>offen</th></tr></thead><tbody>${mkRows}</tbody></table></div>` : ''}
+
+<h2>Einzeltipps</h2>
+<div class="scroll"><table><thead><tr><th>Datum</th><th>Quelle</th><th>Spiel</th><th>Tipp</th><th>Quote (Ref)</th><th>Ergebnis</th></tr></thead><tbody>${singles}</tbody></table></div>
+
+<footer>ROI auf Basis einheitlicher Referenzquote (API-Football · Bet365) je Spiel + Markt; Eigenquote der Quelle in Klammern.<br>Auto-Refresh alle 5 Min · nur zu Analysezwecken.</footer>
 </div></body></html>`;
 }
 
