@@ -4,7 +4,8 @@
 # erreichbar (so in docker-compose.yml gebunden) – Caddy proxyt davor.
 
 # Variante A: eigene Subdomain (empfohlen)
-tipps.deine-domain.de {
+# Voraussetzung: DNS-A-Record  tipps.volleyscope.com -> 2.56.98.246
+tipps.volleyscope.com {
     encode gzip
 
     # optional, aber empfohlen: Passwortschutz
@@ -16,12 +17,15 @@ tipps.deine-domain.de {
     reverse_proxy 127.0.0.1:8080
 }
 
-# --- Variante B: Unterpfad auf bestehender Domain ----------------------------
-# Falls keine Subdomain: innerhalb deines vorhandenen Site-Blocks ergänzen.
+# --- Variante B: Unterpfad auf volleyscope.com -------------------------------
+# Falls du keine Subdomain anlegen willst: deinen bestehenden volleyscope.com-Block
+# in handle-Blöcke umbauen, damit /tipps zum Tracker geht und der Rest zur App:
 #
-# deine-domain.de {
+# volleyscope.com {
 #     handle_path /tipps* {
-#         reverse_proxy 127.0.0.1:8080
+#         reverse_proxy 127.0.0.1:8080      # Tracker-Dashboard
 #     }
-#     # ... dein bestehender App-Proxy (Port 8000) bleibt unverändert ...
+#     handle {
+#         reverse_proxy 127.0.0.1:8000      # bestehende App (waitress) – unverändert
+#     }
 # }
