@@ -42,8 +42,10 @@ export default {
         if (ev.isCancelled || ev.isPostponed) continue;
         if (ev.prediction1x2 == null || ev.predictionPoints !== 10) continue;
         const market = String(ev.prediction1x2); // '1', 'X', '2'
-        const winner = market === '1' ? ev.homeTeam : market === '2' ? ev.awayTeam : null;
-        const market_raw = winner ? `Sieg ${winner}` : 'Unentschieden';
+        // market_raw = konstanter Markttyp-String → Konfliktschlüssel ist pro Spiel eindeutig.
+        // Ändert SoccerVista seine Prognose, wird dieselbe Zeile per UPSERT überschrieben
+        // statt eine zweite Zeile zu erzeugen (Duplikat-Problem).
+        const market_raw = '1X2';
         const ko = ev.timeStart ? new Date(ev.timeStart * 1000).toISOString() : null;
         tips.push({
           home: ev.homeTeam,
