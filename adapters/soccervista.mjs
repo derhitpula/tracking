@@ -33,12 +33,14 @@ export default {
         if (ev.isCancelled || ev.isPostponed) continue;
         if (ev.prediction1x2 == null || ev.predictionPoints !== 10) continue;
         const market = String(ev.prediction1x2); // '1', 'X', '2'
+        const winner = market === '1' ? ev.homeTeam : market === '2' ? ev.awayTeam : null;
+        const market_raw = winner ? `Sieg ${winner}` : 'Unentschieden';
         const ko = ev.timeStart ? new Date(ev.timeStart * 1000).toISOString() : null;
         tips.push({
           home: ev.homeTeam,
           away: ev.awayTeam,
           market,
-          market_raw: ev.predictionMatchWinner || market,
+          market_raw,
           match_date: ko ? ko.slice(0, 10) : new Date().toISOString().slice(0, 10),
           kickoff: ko,
         });
