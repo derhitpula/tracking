@@ -1,6 +1,7 @@
 // Adapter: footyaccumulators.com – Bet of the Day
 // Tipps werden client-seitig via React gerendert → fetchViaBrowser erzwingen.
-import { stripTags, fetchViaBrowser } from '../lib/fetch.mjs';
+import { stripTags } from '../lib/fetch.mjs';
+import { fetchViaBrowser } from '../lib/browser.mjs';
 import { splitTeams, parseOdds, matchAll } from '../lib/parse.mjs';
 
 export default {
