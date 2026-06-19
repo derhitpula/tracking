@@ -10,9 +10,10 @@ import freetips from './freetips.mjs';
 import footballtips from './footballtips.mjs';
 import soccervista from './soccervista.mjs';
 import footballpredictions_net from './footballpredictions_net.mjs';
+import soccervital from './soccervital.mjs';
 
 export const ADAPTERS = [
   betmines, footballsupertips, footyaccumulators, footballpredictions_com,
   bettingtips4you, thatsagoal, protipster, freetips, footballtips,
-  soccervista, footballpredictions_net,
+  soccervista, footballpredictions_net, soccervital,
 ];
