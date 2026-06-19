@@ -26,7 +26,8 @@ export default {
           const kickoff   = m.date_iso || null;
           const match_date = kickoff ? kickoff.slice(0, 10) : new Date().toISOString().slice(0, 10);
           const market_raw = g.selection?.name || g.market?.name || '';
-          tips.push({ home, away, market_raw, match_date, kickoff });
+          const odds = g.selection?.odds ?? g.selection?.decimalOdds ?? g.odds ?? null;
+          tips.push({ home, away, market_raw, match_date, kickoff, odds });
         }
       }
     } catch { /* JSON-Fehler ignorieren */ }

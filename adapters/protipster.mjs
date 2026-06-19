@@ -14,8 +14,9 @@ export default {
     if (!host || !opp) return [];
     const home = host.replace(/\\u[0-9a-f]{4}/gi, '').trim();
     const away = opp.replace(/\\u[0-9a-f]{4}/gi, '').trim();
-    // Pick aus dem Experten-Block
+    // Pick aus dem Experten-Block – wenn leer, ist der Tipp heute nicht öffentlich
     const pickBlock = stripTags((html.match(/class="expert-pick[^"]*"[^>]*>(.*?)<\/div>/s) || [])[1] || '');
+    if (!pickBlock.trim()) return [];
     const h3 = stripTags((html.match(/<h3>(.*?)<\/h3>/s) || [])[1] || '');
     let market_raw = h3 || pickBlock.slice(0, 40);
     // "expect <Team> to take the win" -> Heim/Auswärtssieg
