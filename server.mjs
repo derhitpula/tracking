@@ -12,6 +12,8 @@ const roiNum = (s) => (s.stake ? 100 * (s.ret - s.stake) / s.stake : null);
 const esc = (s) => String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 // YYYY-MM-DD -> TT.MM.JJJJ (deutsches Datumsformat)
 const deDate = (iso) => { const m = String(iso ?? '').match(/^(\d{4})-(\d{2})-(\d{2})/); return m ? `${m[3]}.${m[2]}.${m[1]}` : (iso ?? '?'); };
+// ISO-Kickoff -> HH:MM (UTC)
+const kickoffTime = (iso) => { const m = String(iso ?? '').match(/T(\d{2}):(\d{2})/); return m ? `${m[1]}:${m[2]}` : ''; };
 
 // Stabile Farbe je Quelle (HSL aus Namens-Hash)
 function srcColor(name) {
@@ -88,7 +90,8 @@ function svHtml() {
     const oddCell = t.ref_odds != null
       ? `<b class="odd">${t.ref_odds}</b>`
       : `<span class="muted">—</span>`;
-    return `<tr><td class="nowrap">${deDate(t.match_date)}</td>` +
+    const kt = kickoffTime(t.kickoff);
+    return `<tr><td class="nowrap">${deDate(t.match_date)}${kt ? `<br><span class="kt">${kt}</span>` : ''}</td>` +
       `<td class="match">${esc(t.home)} <span class="vs">vs</span> ${esc(t.away)}${sc}</td>` +
       `<td><span class="tip">${esc(tipLabel(t.market) || t.market_raw || '?')}</span></td>` +
       `<td>${oddCell}</td><td>${pill(r)}</td></tr>`;
@@ -148,7 +151,7 @@ tbody tr:hover{background:var(--panel2)}
 .bar-lbl{font-size:11px;color:var(--muted);font-variant-numeric:tabular-nums;white-space:nowrap}
 .match{font-weight:500}.match .vs{color:var(--muted);font-size:11px;padding:0 2px}
 .score{margin-left:5px;font-size:11px;color:var(--muted);background:var(--bg2);padding:1px 6px;border-radius:5px;font-weight:600}
-.tip{color:#cdd6e6}.odd{font-variant-numeric:tabular-nums;font-weight:700}
+.tip{color:#cdd6e6}.odd{font-variant-numeric:tabular-nums;font-weight:700}.kt{color:var(--muted);font-size:11px}
 .info{color:var(--muted);font-size:12px;margin-top:8px;padding:8px 12px;border:1px solid var(--line);border-radius:8px;background:var(--panel)}
 footer{color:var(--muted);margin-top:30px;font-size:11px;line-height:1.6;border-top:1px solid var(--line);padding-top:14px}
 .scroll{overflow-x:auto}
@@ -216,7 +219,8 @@ function sv2Html() {
     const oddCell = refOdds != null
       ? `<b class="odd">${refOdds}</b>${ownOdds != null && ownOdds !== refOdds ? ` <span class="muted own">(${ownOdds})</span>` : ''}`
       : (ownOdds != null ? `<span class="odd">${ownOdds}</span>` : '<span class="muted">—</span>');
-    return `<tr><td class="nowrap">${deDate(t.match_date)}</td>` +
+    const kt = kickoffTime(t.kickoff);
+    return `<tr><td class="nowrap">${deDate(t.match_date)}${kt ? `<br><span class="kt">${kt}</span>` : ''}</td>` +
       `<td class="match">${esc(t.home)} <span class="vs">vs</span> ${esc(t.away)}${sc}</td>` +
       `<td><span class="tip">${esc(tipLabel(t.market) || t.market_raw || '?')}</span></td>` +
       `<td>${oddCell}</td><td>${pill(r)}</td></tr>`;
@@ -276,7 +280,7 @@ tbody tr:hover{background:var(--panel2)}
 .bar-lbl{font-size:11px;color:var(--muted);font-variant-numeric:tabular-nums;white-space:nowrap}
 .match{font-weight:500}.match .vs{color:var(--muted);font-size:11px;padding:0 2px}
 .score{margin-left:5px;font-size:11px;color:var(--muted);background:var(--bg2);padding:1px 6px;border-radius:5px;font-weight:600}
-.tip{color:#cdd6e6}.odd{font-variant-numeric:tabular-nums;font-weight:700}.own{font-weight:500;font-size:12px}
+.tip{color:#cdd6e6}.odd{font-variant-numeric:tabular-nums;font-weight:700}.own{font-weight:500;font-size:12px}.kt{color:var(--muted);font-size:11px}
 footer{color:var(--muted);margin-top:30px;font-size:11px;line-height:1.6;border-top:1px solid var(--line);padding-top:14px}
 .scroll{overflow-x:auto}
 </style></head><body><div class="wrap">
@@ -331,7 +335,8 @@ function html() {
     const oddCell = t.ref_odds != null
       ? `<b class="odd">${t.ref_odds}</b>${t.odds != null && t.odds !== t.ref_odds ? ` <span class="muted own">(${t.odds})</span>` : ''}`
       : (t.odds != null ? `<span class="odd">${t.odds}</span>` : '<span class="muted">–</span>');
-    return `<tr><td class="nowrap">${deDate(t.match_date)}</td><td>${srcBadge(t.source)}</td>` +
+    const kt = kickoffTime(t.kickoff);
+    return `<tr><td class="nowrap">${deDate(t.match_date)}${kt ? `<br><span class="kt">${kt}</span>` : ''}</td><td>${srcBadge(t.source)}</td>` +
       `<td class="match">${esc(t.home)} <span class="vs">vs</span> ${esc(t.away)}${sc}</td>` +
       `<td><span class="tip">${esc(t.market_raw || tipLabel(t.market) || '?')}</span></td>` +
       `<td>${oddCell}</td><td>${pill(r)}</td></tr>`;
