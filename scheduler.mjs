@@ -38,6 +38,7 @@ if (/^(1|true|yes|on)$/i.test(process.env.ENABLE_DASHBOARD || '')) {
   console.log(`[${ts()}] Dashboard deaktiviert (headless). Report via: docker compose exec tracker node track.mjs report`);
 }
 
-// Erststart sofort, dann in Intervallen. results startet leicht versetzt.
+// Erststart sofort, dann in Intervallen (versetzt, damit collect -> odds -> results).
 loop('collect', COLLECT_EVERY);
+setTimeout(() => loop('odds', COLLECT_EVERY), 30 * 1000);   // Referenzquoten nach collect
 setTimeout(() => loop('results', RESULTS_EVERY), 60 * 1000);
