@@ -179,7 +179,7 @@ footer{color:var(--muted);margin-top:30px;font-size:11px;line-height:1.6;border-
 
 function html() {
   const db = openDb();
-  const rows = db.prepare(`SELECT * FROM tips WHERE source != '${SV_SOURCE}' ORDER BY match_date DESC, source`).all();
+  const rows = db.prepare(`SELECT * FROM tips WHERE source != '${SV_SOURCE}' ORDER BY match_date DESC, CASE WHEN kickoff IS NULL THEN 1 ELSE 0 END, kickoff ASC, source`).all();
   db.close();
   const units = toUnits(rows);
   const { overall, bySource } = aggregate(units);
