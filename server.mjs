@@ -46,9 +46,138 @@ function srcRow(name, s) {
     `<td><span class="pill pending sm">${s.pending}</span></td></tr>`;
 }
 
+// SoccerVista läuft als eigener Tracker (/soccervista) und wird aus dem
+// Haupt-Dashboard ausgeblendet.
+const SV_SOURCE = 'soccervista';
+
+function svHtml() {
+  const db = openDb();
+  const rows = db.prepare("SELECT * FROM tips WHERE source=? ORDER BY match_date DESC, kickoff").all(SV_SOURCE);
+  db.close();
+  if (!rows.length) return `<!doctype html><html lang="de"><head><meta charset="utf-8"><title>SoccerVista Tracker</title></head><body><p>Noch keine Daten. Erst <code>node track.mjs collect soccervista</code> ausführen.</p></body></html>`;
+
+  const settled = rows.filter((r) => r.result && r.result !== 'pending');
+  const won = settled.filter((r) => r.result === 'won').length;
+  const lost = settled.filter((r) => r.result === 'lost').length;
+  const pending = rows.filter((r) => !r.result || r.result === 'pending').length;
+  const winRate = settled.length ? (100 * won / settled.length).toFixed(1) : null;
+
+  // Stats nach Markt
+  const byMkt = {};
+  for (const r of rows) {
+    const k = r.market || '?';
+    byMkt[k] = byMkt[k] || { won: 0, lost: 0, pending: 0 };
+    if (r.result === 'won') byMkt[k].won++;
+    else if (r.result === 'lost') byMkt[k].lost++;
+    else byMkt[k].pending++;
+  }
+
+  const mktRows = Object.entries(byMkt).sort((a, b) => (b[1].won + b[1].lost) - (a[1].won + a[1].lost)).map(([k, s]) => {
+    const tot = s.won + s.lost;
+    const wr = tot ? (100 * s.won / tot).toFixed(1) + '%' : '—';
+    return `<tr><td><b>${esc(tipLabel(k))}</b></td><td>${bar(s.won, s.lost)}</td><td>${wr}</td>` +
+      `<td><span class="pill pending sm">${s.pending}</span></td></tr>`;
+  }).join('');
+
+  const tipRows = rows.slice(0, 120).map((t) => {
+    const r = t.result || 'pending';
+    const sc = t.ft_home != null ? `<span class="score">${t.ft_home}–${t.ft_away}</span>` : '';
+    const oddCell = t.ref_odds != null
+      ? `<b class="odd">${t.ref_odds}</b>`
+      : `<span class="muted">—</span>`;
+    return `<tr><td class="nowrap">${deDate(t.match_date)}</td>` +
+      `<td class="match">${esc(t.home)} <span class="vs">vs</span> ${esc(t.away)}${sc}</td>` +
+      `<td><span class="tip">${esc(tipLabel(t.market) || t.market_raw || '?')}</span></td>` +
+      `<td>${oddCell}</td><td>${pill(r)}</td></tr>`;
+  }).join('');
+
+  const dates = rows.map((t) => t.match_date).filter(Boolean).sort();
+
+  return `<!doctype html><html lang="de"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta http-equiv="refresh" content="300">
+<title>SoccerVista Tracker</title><style>
+:root{
+  --bg:#04140d; --bg2:#061b12; --panel:#082318; --panel2:#0b3122; --line:#13402d;
+  --txt:#eafff5; --muted:#79a892; --accent:#ffdf1b; --accent2:#0f5e42;
+  --green:#2fe08a; --red:#ff6b6b; --amber:#ffdf1b; --grey:#5f8473;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+body{font:14px/1.55 -apple-system,BlinkMacSystemFont,"Segoe UI",system-ui,sans-serif;margin:0;
+  background:radial-gradient(1200px 600px at 50% -200px,#0d4a33 0,var(--bg) 55%);color:var(--txt);min-height:100vh}
+.wrap{max-width:1000px;margin:0 auto;padding:28px 20px 60px}
+header{display:flex;align-items:flex-end;justify-content:space-between;gap:16px;flex-wrap:wrap;margin-bottom:6px}
+h1{font-size:22px;font-weight:800;margin:0;letter-spacing:-.02em;display:flex;align-items:center;gap:10px}
+h1 .logo{width:28px;height:28px;display:grid;place-items:center;border-radius:50%;
+  background:var(--accent2);border:2px solid var(--accent);font-size:13px;box-shadow:0 4px 14px rgba(255,223,27,.3)}
+h2{font-size:12px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);font-weight:700;margin:30px 0 10px}
+.back{font-size:12px;color:var(--muted);text-decoration:none;padding:4px 10px;border:1px solid var(--line);border-radius:6px}
+.back:hover{color:var(--txt)}
+.sub{color:var(--muted);font-size:12px;text-align:right}
+.sub b{color:var(--txt);font-weight:600}
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px;margin-top:18px}
+.card{position:relative;background:linear-gradient(180deg,var(--panel2),var(--panel));border:1px solid var(--line);
+  border-radius:14px;padding:14px 16px;overflow:hidden}
+.card::before{content:"";position:absolute;inset:0 auto 0 0;width:3px;background:var(--accent)}
+.card.pos::before{background:var(--green)}.card.neg::before{background:var(--red)}
+.card .v{font-size:24px;font-weight:800;letter-spacing:-.02em;line-height:1.1}
+.card .l{color:var(--muted);font-size:11px;margin-top:3px;font-weight:500}
+.card.pos .v{color:var(--green)}.card.neg .v{color:var(--red)}
+table{width:100%;border-collapse:separate;border-spacing:0;background:var(--panel);
+  border:1px solid var(--line);border-radius:14px;overflow:hidden}
+th,td{text-align:left;padding:10px 13px;border-bottom:1px solid var(--line);font-size:13px;vertical-align:middle}
+tbody tr:last-child td{border-bottom:none}
+th{background:var(--bg2);color:var(--muted);font-weight:600;font-size:11px;text-transform:uppercase;letter-spacing:.05em}
+tbody tr{transition:background .12s}
+tbody tr:hover{background:var(--panel2)}
+.nowrap{white-space:nowrap;color:var(--muted);font-variant-numeric:tabular-nums}
+.muted{color:var(--muted)}.pos{color:var(--green);font-weight:600}.neg{color:var(--red);font-weight:600}
+.pill{display:inline-block;padding:3px 10px;border-radius:999px;font-size:11px;font-weight:700}
+.pill.sm{padding:1px 8px;font-weight:600}
+.pill.won{background:rgba(57,217,138,.16);box-shadow:inset 0 0 0 1px rgba(57,217,138,.35);color:var(--green)}
+.pill.lost{color:var(--red);background:rgba(255,107,107,.16);box-shadow:inset 0 0 0 1px rgba(255,107,107,.32)}
+.pill.pending{color:var(--amber);background:rgba(255,193,69,.14);box-shadow:inset 0 0 0 1px rgba(255,193,69,.3)}
+.pill.void,.pill.unknown{color:var(--grey);background:rgba(107,118,137,.16);box-shadow:inset 0 0 0 1px rgba(107,118,137,.3)}
+.bar{display:flex;align-items:center;gap:8px;min-width:100px}
+.bar-track{flex:1;height:6px;background:var(--bg2);border-radius:999px;overflow:hidden;min-width:50px}
+.bar-fill{height:100%;background:linear-gradient(90deg,var(--green),#8ef0bf);border-radius:999px}
+.bar-lbl{font-size:11px;color:var(--muted);font-variant-numeric:tabular-nums;white-space:nowrap}
+.match{font-weight:500}.match .vs{color:var(--muted);font-size:11px;padding:0 2px}
+.score{margin-left:5px;font-size:11px;color:var(--muted);background:var(--bg2);padding:1px 6px;border-radius:5px;font-weight:600}
+.tip{color:#cdd6e6}.odd{font-variant-numeric:tabular-nums;font-weight:700}
+.info{color:var(--muted);font-size:12px;margin-top:8px;padding:8px 12px;border:1px solid var(--line);border-radius:8px;background:var(--panel)}
+footer{color:var(--muted);margin-top:30px;font-size:11px;line-height:1.6;border-top:1px solid var(--line);padding-top:14px}
+.scroll{overflow-x:auto}
+</style></head><body><div class="wrap">
+<header>
+  <h1><span class="logo">⚽</span> SoccerVista Tracker</h1>
+  <div class="sub">${deDate(dates[0])} – ${deDate(dates.at(-1))} · <b>${rows.length}</b> Picks<br>
+    aktualisiert ${new Date().toLocaleString('de-DE')} &nbsp;<a class="back" href="/">← Hauptdashboard</a></div>
+</header>
+
+<div class="cards">
+  <div class="card ${won > lost ? 'pos' : ''}"><div class="v">${won}<span class="muted" style="font-size:15px">/${won + lost}</span></div><div class="l">Treffer (abgerechnet)</div></div>
+  <div class="card ${winRate !== null && Number(winRate) >= 50 ? 'pos' : winRate !== null ? 'neg' : ''}"><div class="v">${winRate !== null ? winRate + '%' : '—'}</div><div class="l">Trefferquote</div></div>
+  <div class="card"><div class="v" style="color:var(--amber)">${pending}</div><div class="l">offen</div></div>
+  <div class="card"><div class="v">${settled.length}</div><div class="l">abgerechnet</div></div>
+</div>
+
+<div class="info">ℹ Quoten: SoccerVista liefert keine eigenen Quoten. Referenzquoten (Bet365 via API-Football) werden automatisch eingetragen – für viele Nischenligen (Australien, Irland, Belarus …) nicht verfügbar.</div>
+
+<h2>Nach Markt</h2>
+<div class="scroll"><table><thead><tr><th>Markt</th><th>Trefferquote</th><th>Quote %</th><th>offen</th></tr></thead><tbody>${mktRows}</tbody></table></div>
+
+<h2>Alle Picks</h2>
+<div class="scroll"><table><thead><tr><th>Datum</th><th>Spiel</th><th>Tipp</th><th>Quote (Ref)</th><th>Ergebnis</th></tr></thead><tbody>${tipRows}</tbody></table></div>
+
+<footer>Picks: predictionPoints=10 (max. Konfidenz) aus der SoccerVista-API · Auto-Refresh 5 Min</footer>
+</div></body></html>`;
+}
+
 function html() {
   const db = openDb();
-  const rows = db.prepare('SELECT * FROM tips ORDER BY match_date DESC, source').all();
+  const rows = db.prepare(`SELECT * FROM tips WHERE source != '${SV_SOURCE}' ORDER BY match_date DESC, source`).all();
   db.close();
   const units = toUnits(rows);
   const { overall, bySource } = aggregate(units);
@@ -185,9 +314,10 @@ ${mkRows ? `<h2>Nach Markt</h2><div class="scroll"><table><thead><tr><th>Markt</
 export function startServer(port = 8080) {
   createServer((req, res) => {
     if (req.url === '/health') { res.writeHead(200); return res.end('ok'); }
+    const fn = req.url === '/soccervista' || req.url === '/soccervista/' ? svHtml : html;
     try {
       res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
-      res.end(html());
+      res.end(fn());
     } catch (e) {
       res.writeHead(500); res.end('Fehler: ' + e.message);
     }
