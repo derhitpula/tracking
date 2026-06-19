@@ -90,19 +90,20 @@ function html() {
 <meta http-equiv="refresh" content="300">
 <title>Tipp-Tracker</title><style>
 :root{
-  --bg:#0b0e14; --bg2:#10141d; --panel:#141925; --panel2:#19202e; --line:#232b3b;
-  --txt:#e8ecf3; --muted:#7c879c; --accent:#5b8cff; --accent2:#9a6bff;
-  --green:#39d98a; --red:#ff6b6b; --amber:#ffc145; --grey:#6b7689;
+  /* Bet365-Look: tiefes Grün + gelbe Akzente */
+  --bg:#0a3d2c; --bg2:#0c4733; --panel:#0e5039; --panel2:#117045; --line:#1c6e50;
+  --txt:#eafff5; --muted:#8fc3ad; --accent:#ffdf1b; --accent2:#14805e;
+  --green:#2fe08a; --red:#ff6b6b; --amber:#ffdf1b; --grey:#6f9586;
   color-scheme:dark;
 }
 *{box-sizing:border-box}
 body{font:14px/1.55 -apple-system,BlinkMacSystemFont,"Segoe UI",system-ui,sans-serif;margin:0;
-  background:radial-gradient(1200px 600px at 50% -200px,#16203a 0,var(--bg) 60%);color:var(--txt);min-height:100vh}
+  background:radial-gradient(1200px 600px at 50% -200px,#14805e 0,var(--bg) 55%);color:var(--txt);min-height:100vh}
 .wrap{max-width:1080px;margin:0 auto;padding:28px 20px 60px}
 header{display:flex;align-items:flex-end;justify-content:space-between;gap:16px;flex-wrap:wrap;margin-bottom:6px}
 h1{font-size:24px;font-weight:800;margin:0;letter-spacing:-.02em;display:flex;align-items:center;gap:10px}
-h1 .logo{width:30px;height:30px;display:grid;place-items:center;border-radius:9px;
-  background:linear-gradient(135deg,var(--accent),var(--accent2));font-size:17px;box-shadow:0 4px 14px rgba(91,140,255,.4)}
+h1 .logo{width:30px;height:30px;display:grid;place-items:center;border-radius:50%;
+  background:var(--accent2);border:2px solid var(--accent);font-size:15px;box-shadow:0 4px 14px rgba(255,223,27,.3)}
 h2{font-size:13px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);font-weight:700;margin:34px 0 12px}
 .sub{color:var(--muted);font-size:12.5px;text-align:right}
 .sub b{color:var(--txt);font-weight:600}
@@ -129,7 +130,7 @@ tbody tr:hover{background:var(--panel2)}
 .badge{display:inline-block;padding:2px 9px;border-radius:999px;font-size:11.5px;font-weight:600;white-space:nowrap}
 .badge.src{color:var(--c);background:color-mix(in srgb,var(--c) 16%,transparent);
   border:1px solid color-mix(in srgb,var(--c) 35%,transparent)}
-.badge.type{color:var(--accent2);background:rgba(154,107,255,.14);border:1px solid rgba(154,107,255,.3);text-transform:capitalize}
+.badge.type{color:#0a3d2c;background:var(--accent);border:1px solid var(--accent);font-weight:700;text-transform:capitalize}
 
 .pill{display:inline-block;padding:3px 11px;border-radius:999px;font-size:11.5px;font-weight:700;letter-spacing:.01em}
 .pill.sm{padding:1px 9px;font-weight:600}
