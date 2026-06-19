@@ -1,0 +1,21 @@
+# Secrets & Laufzeitdaten
+.env
+data/
+*.db
+*.db-journal
+
+# Logs / temporär
+*.log
+sched.log
+ft_live.html
+
+# Gescrapte Test-HTMLs (Dritt-Inhalte, lokal re-erzeugbar)
+test/fixtures/
+
+# Node / OS
+node_modules/
+.DS_Store
+Thumbs.db
+
+# Lokale Claude-Code-Einstellungen
+.claude/

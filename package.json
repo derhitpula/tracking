@@ -1,0 +1,15 @@
+{
+  "name": "tipp-tracker",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Multi-Source Fußball-Tipp-Tracker (Sammeln + Auswerten)",
+  "engines": { "node": ">=22.5" },
+  "scripts": {
+    "collect": "node track.mjs collect",
+    "results": "node track.mjs results",
+    "report": "node track.mjs report",
+    "serve": "node server.mjs",
+    "start": "node scheduler.mjs"
+  }
+}

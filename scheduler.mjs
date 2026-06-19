@@ -1,0 +1,35 @@
+// Dauerlauf-Scheduler für den VPS: sammelt periodisch Tipps, holt Ergebnisse
+// und betreibt das Dashboard. Ersetzt host-seitiges cron – läuft im Container.
+import { spawn } from 'node:child_process';
+import { fileURLToPath } from 'node:url';
+import { dirname, join } from 'node:path';
+import { startServer } from './server.mjs';
+
+const DIR = dirname(fileURLToPath(import.meta.url));
+const H = 3600 * 1000;
+const COLLECT_EVERY = (Number(process.env.COLLECT_EVERY_HOURS) || 6) * H;
+const RESULTS_EVERY = (Number(process.env.RESULTS_EVERY_HOURS) || 1) * H;
+const PORT = Number(process.env.PORT) || 8080;
+
+const ts = () => new Date().toISOString().replace('T', ' ').slice(0, 19);
+
+function run(cmd) {
+  return new Promise((resolve) => {
+    console.log(`[${ts()}] ▶ ${cmd}`);
+    const p = spawn(process.execPath, [join(DIR, 'track.mjs'), cmd], { stdio: 'inherit' });
+    p.on('close', (code) => { console.log(`[${ts()}] ✓ ${cmd} (exit ${code})`); resolve(code); });
+    p.on('error', (e) => { console.log(`[${ts()}] ✗ ${cmd}: ${e.message}`); resolve(1); });
+  });
+}
+
+async function loop(cmd, every) {
+  for (;;) { await run(cmd); await new Promise((r) => setTimeout(r, every)); }
+}
+
+console.log(`[${ts()}] Scheduler gestartet · collect alle ${COLLECT_EVERY / H}h · results alle ${RESULTS_EVERY / H}h`);
+console.log(`[${ts()}] API-Football-Key: ${process.env.APIFOOTBALL_KEY ? 'gesetzt' : 'FEHLT (nur TheSportsDB-Fallback)'}`);
+startServer(PORT);
+
+// Erststart sofort, dann in Intervallen. results startet leicht versetzt.
+loop('collect', COLLECT_EVERY);
+setTimeout(() => loop('results', RESULTS_EVERY), 60 * 1000);

@@ -1,0 +1,13 @@
+services:
+  tracker:
+    build: .
+    image: tipp-tracker
+    container_name: tipp-tracker
+    restart: unless-stopped          # 24/7: startet nach Reboot/Absturz neu
+    env_file: .env
+    environment:
+      - TZ=${TZ:-Europe/Berlin}
+    ports:
+      - "${DASHBOARD_PORT:-8080}:8080"
+    volumes:
+      - ./data:/app/data             # DB & Ergebnis-Cache bleiben erhalten
