@@ -7,7 +7,7 @@ import { matchAll, parseOdds } from '../lib/parse.mjs';
 export default {
   id: 'soccervital',
   name: 'SoccerVital – Bet of the Day Bankers',
-  url: 'https://www.soccervital.com/bet/?sh=-2',
+  url: 'https://www.soccervital.com/bet/',
   parse(html) {
     const tips = [];
     const today = new Date().toISOString().slice(0, 10);
