@@ -74,17 +74,21 @@ cd marktanal
 Das war's. Der Container läuft dauerhaft (`restart: unless-stopped`, also auch
 nach Reboot), sammelt automatisch (Default alle 6 h) und holt Ergebnisse (alle 1 h).
 
-- **Dashboard** im Browser: `http://<server-ip>:8080` (Report, ROI je Quelle/Markt,
-  letzte Tipps; Auto-Refresh alle 5 Min).
-- **Logs:** `docker compose logs -f`
+**Headless – kein Web-Zugang, keine URL, kein offener Port** (Standard):
 - **Report im Terminal:** `docker compose exec tracker node track.mjs report`
+- **Tipps auflisten:** `docker compose exec tracker node track.mjs list`
+- **Logs:** `docker compose logs -f`
 - **Stoppen / Updaten:** `docker compose down` · `docker compose up -d --build`
 
 Konfiguration über `.env` (aus `.env.example`):
-`APIFOOTBALL_KEY`, `DASHBOARD_PORT`, `TZ`, `COLLECT_EVERY_HOURS`, `RESULTS_EVERY_HOURS`.
+`APIFOOTBALL_KEY`, `TZ`, `COLLECT_EVERY_HOURS`, `RESULTS_EVERY_HOURS`.
 Die Daten liegen im gemounteten Ordner `./data` und bleiben über Updates/Reboots erhalten.
 
 Windows-VPS mit Docker Desktop: `./install.ps1` (PowerShell).
+
+**Optionales Web-Dashboard** (nur falls gewünscht): in `.env` `ENABLE_DASHBOARD=true`
+setzen und in `docker-compose.yml` die `ports`-Zeile einkommentieren (an `127.0.0.1`
+gebunden → davor ein Reverse Proxy wie Caddy, siehe `deploy/Caddyfile.example`).
 
 ## Automatisch laufen lassen (Windows, ohne Docker)
 

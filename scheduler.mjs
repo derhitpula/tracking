@@ -28,7 +28,13 @@ async function loop(cmd, every) {
 
 console.log(`[${ts()}] Scheduler gestartet · collect alle ${COLLECT_EVERY / H}h · results alle ${RESULTS_EVERY / H}h`);
 console.log(`[${ts()}] API-Football-Key: ${process.env.APIFOOTBALL_KEY ? 'gesetzt' : 'FEHLT (nur TheSportsDB-Fallback)'}`);
-startServer(PORT);
+
+// Dashboard standardmäßig AUS (headless). Mit ENABLE_DASHBOARD=true einschaltbar.
+if (/^(1|true|yes|on)$/i.test(process.env.ENABLE_DASHBOARD || '')) {
+  startServer(PORT);
+} else {
+  console.log(`[${ts()}] Dashboard deaktiviert (headless). Report via: docker compose exec tracker node track.mjs report`);
+}
 
 // Erststart sofort, dann in Intervallen. results startet leicht versetzt.
 loop('collect', COLLECT_EVERY);

@@ -7,8 +7,10 @@ services:
     env_file: .env
     environment:
       - TZ=${TZ:-Europe/Berlin}
-    ports:
-      # nur an localhost gebunden -> Zugriff ausschließlich über Caddy (Reverse Proxy)
-      - "127.0.0.1:${DASHBOARD_PORT:-8080}:8080"
+    # Headless: KEINE Port-Freigabe, kein Web-Zugang.
+    # Dashboard nur bei Bedarf: ENABLE_DASHBOARD=true in .env setzen UND die
+    # folgende Zeile einkommentieren (an localhost gebunden, z. B. für Caddy):
+    # ports:
+    #   - "127.0.0.1:${DASHBOARD_PORT:-8080}:8080"
     volumes:
       - ./data:/app/data             # DB & Ergebnis-Cache bleiben erhalten
