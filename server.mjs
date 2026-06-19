@@ -12,13 +12,15 @@ const roiNum = (s) => (s.stake ? 100 * (s.ret - s.stake) / s.stake : null);
 const esc = (s) => String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 // YYYY-MM-DD -> TT.MM.JJJJ (deutsches Datumsformat)
 const deDate = (iso) => { const m = String(iso ?? '').match(/^(\d{4})-(\d{2})-(\d{2})/); return m ? `${m[3]}.${m[2]}.${m[1]}` : (iso ?? '?'); };
-// ISO-Kickoff -> HH:MM in UTC+2 (CEST)
+// ISO-Kickoff (UTC) -> HH:MM in echter Europe/Berlin-Zeit (CET/CEST mit DST).
+// kickoffs ohne Zeitzonen-Marker werden als UTC interpretiert (Z anhängen).
 const kickoffTime = (iso) => {
   if (!iso) return '';
-  const m = String(iso).match(/T(\d{2}):(\d{2})/);
-  if (!m) return '';
-  const h = (parseInt(m[1]) + 2) % 24;
-  return `${String(h).padStart(2, '0')}:${m[2]}`;
+  let s = String(iso);
+  if (/T\d{2}:\d{2}/.test(s) && !/[Zz]|[+-]\d{2}:?\d{2}$/.test(s)) s += 'Z';
+  const d = new Date(s);
+  if (isNaN(d)) return '';
+  return d.toLocaleTimeString('de-DE', { timeZone: 'Europe/Berlin', hour: '2-digit', minute: '2-digit' });
 };
 
 // Stabile Farbe je Quelle (HSL aus Namens-Hash)
