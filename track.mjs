@@ -18,7 +18,8 @@ import { fetchHtml, sleep } from './lib/fetch.mjs';
 import { normalizeMarket, evalTip, tipLabel } from './lib/markets.mjs';
 import { toUnits, aggregate, marketStats } from './lib/stats.mjs';
 import { today } from './lib/parse.mjs';
-import { resolveResult } from './lib/results.mjs';
+import { resolveResult, findApiFixture } from './lib/results.mjs';
+import { referenceOdds } from './lib/odds.mjs';
 import { ADAPTERS } from './adapters/index.mjs';
 
 const byId = (id) => ADAPTERS.find((a) => a.id === id);
@@ -77,6 +78,32 @@ async function results() {
     done++;
   }
   console.log(`\nFertig: ${done} ausgewertet, ${wait} offen, ${fail} fehlgeschlagen.`);
+  db.close();
+}
+
+// --- odds: einheitliche Referenzquoten je Spiel+Markt holen -----------------
+async function fillOdds() {
+  const db = openDb();
+  const open = db.prepare(`SELECT * FROM tips
+    WHERE ref_odds IS NULL AND market IS NOT NULL AND slip_ref IS NULL
+    ORDER BY match_date, source`).all();
+  if (!open.length) { console.log('Keine Tipps ohne Referenzquote.'); db.close(); return; }
+  const upd = db.prepare('UPDATE tips SET ref_odds=?, ref_fixture=? WHERE id=?');
+  const fxCache = new Map();
+  let done = 0, miss = 0;
+  console.log(`Hole Referenzquoten für ${open.length} Tipp(s) …\n`);
+  for (const t of open) {
+    const ck = `${t.match_date}|${t.home}|${t.away}`;
+    let fx = fxCache.get(ck);
+    if (fx === undefined) { fx = await findApiFixture(t.home, t.away, t.match_date); fxCache.set(ck, fx); }
+    if (!fx) { console.log(`  ? ${t.home} vs ${t.away}: kein API-Spiel`); miss++; continue; }
+    let ro = null; try { ro = await referenceOdds(fx.id, t.market); } catch {}
+    if (ro == null) { console.log(`  – ${t.home} vs ${t.away} [${tipLabel(t.market)}]: keine Marktquote`); miss++; continue; }
+    upd.run(ro, fx.id, t.id);
+    console.log(`  ✓ [${t.source}] ${t.home} vs ${t.away} · ${tipLabel(t.market)} -> Ref @${ro} (Eigenquote ${t.odds ?? '–'})`);
+    done++;
+  }
+  console.log(`\nFertig: ${done} Referenzquoten gesetzt, ${miss} ohne.`);
   db.close();
 }
 
@@ -163,11 +190,12 @@ try {
   switch (cmd) {
     case undefined:
     case 'collect': await collect(args[0]); break;
+    case 'odds': await fillOdds(); break;
     case 'results': await results(); break;
-    case 'update': await collect(args[0]); await results(); break;
+    case 'update': await collect(args[0]); await fillOdds(); await results(); break;
     case 'report': report(); break;
     case 'list': list(args); break;
     case 'sources': sources(); break;
-    default: console.log('Befehle: collect | results | update | report | list | sources');
+    default: console.log('Befehle: collect | odds | results | update | report | list | sources');
   }
 } catch (e) { console.error('Fehler:', e.message); process.exit(1); }

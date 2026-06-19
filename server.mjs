@@ -39,9 +39,13 @@ function html() {
   const singles = rows.filter((t) => !t.slip_ref).slice(0, 60).map((t) => {
     const sc = t.ft_home != null ? ` (${t.ft_home}-${t.ft_away})` : '';
     const r = t.result || 'pending';
+    // Referenzquote (einheitlich) anzeigen; Eigenquote klein dahinter
+    const oddCell = t.ref_odds != null
+      ? `<b>${t.ref_odds}</b>${t.odds != null && t.odds !== t.ref_odds ? ` <span style="color:#667">(${t.odds})</span>` : ''}`
+      : (t.odds ?? '–');
     return `<tr class="r-${r}"><td>${esc(t.match_date)}</td><td>${esc(t.source)}</td>` +
       `<td>${esc(t.home)} vs ${esc(t.away)}${sc}</td><td>${esc(t.market_raw || '?')}</td>` +
-      `<td>${t.odds ?? '–'}</td><td><b>${r}</b></td></tr>`;
+      `<td>${oddCell}</td><td><b>${r}</b></td></tr>`;
   }).join('');
   const srcRows = [...bySource].sort((a, b) => (b[1].won + b[1].lost) - (a[1].won + a[1].lost)).map(([k, s]) => row(k, s)).join('');
   const mkRows = [...byMarket].map(([k, s]) => [k, s]).filter(([, s]) => s.won + s.lost).sort((a, b) => (b[1].won + b[1].lost) - (a[1].won + a[1].lost)).map(([k, s]) => row(k, s)).join('');
@@ -75,8 +79,8 @@ footer{color:#667;margin-top:24px;font-size:11px}
 <h2>Nach Quelle</h2><table><tr><th>Quelle</th><th>Treffer</th><th>Quote</th><th>ROI</th><th>offen</th></tr>${srcRows}</table>
 ${comboRows ? `<h2>Kombis</h2><table><tr><th>Datum</th><th>Quelle</th><th>Typ</th><th>Legs</th><th>Quote</th><th>Ergebnis</th></tr>${comboRows}</table>` : ''}
 ${mkRows ? `<h2>Nach Markt (Selektions-Ebene)</h2><table><tr><th>Markt</th><th>Treffer</th><th>Quote</th><th>ROI</th><th>offen</th></tr>${mkRows}</table>` : ''}
-<h2>Einzeltipps</h2><table><tr><th>Datum</th><th>Quelle</th><th>Spiel</th><th>Tipp</th><th>Quote</th><th>Ergebnis</th></tr>${singles}</table>
-<footer>Auto-Refresh alle 5 Min · nur zu Analysezwecken</footer>
+<h2>Einzeltipps</h2><table><tr><th>Datum</th><th>Quelle</th><th>Spiel</th><th>Tipp</th><th>Quote (Ref)</th><th>Ergebnis</th></tr>${singles}</table>
+<footer>ROI = einheitliche Referenzquote (API-Football, Bet365) je Spiel+Markt; Eigenquote der Quelle in Klammern · Auto-Refresh alle 5 Min · nur zu Analysezwecken</footer>
 </div></body></html>`;
 }
 
