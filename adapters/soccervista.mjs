@@ -36,11 +36,16 @@ export default {
     try { data = JSON.parse(text); } catch { return []; }
     if (!Array.isArray(data)) return [];
     const tips = [];
+    // Dedup per Kickoff-Timestamp: SoccerVista listet dasselbe Spiel oft in mehreren
+    // Liga-Blöcken (manchmal mit leicht verschiedenen Teamnamen). Ersten Treffer behalten.
+    const seenKickoff = new Set();
     for (const league of data) {
       if (LEAGUE_BLOCKLIST.has(league.tournamentTemplateId)) continue;
       for (const ev of (league.events || [])) {
         if (ev.isCancelled || ev.isPostponed) continue;
         if (ev.prediction1x2 == null || ev.predictionPoints !== 10) continue;
+        if (ev.timeStart && seenKickoff.has(ev.timeStart)) continue;
+        if (ev.timeStart) seenKickoff.add(ev.timeStart);
         const market = String(ev.prediction1x2); // '1', 'X', '2'
         // market_raw = konstanter Markttyp-String → Konfliktschlüssel ist pro Spiel eindeutig.
         // Ändert SoccerVista seine Prognose, wird dieselbe Zeile per UPSERT überschrieben
@@ -48,8 +53,8 @@ export default {
         const market_raw = '1X2';
         const ko = ev.timeStart ? new Date(ev.timeStart * 1000).toISOString() : null;
         tips.push({
-          home: ev.homeTeam,
-          away: ev.awayTeam,
+          home: (ev.homeTeam || '').trim(),
+          away: (ev.awayTeam || '').trim(),
           market,
           market_raw,
           match_date: ko ? ko.slice(0, 10) : new Date().toISOString().slice(0, 10),
