@@ -52,7 +52,9 @@ const SV_SOURCE = 'soccervista';
 
 function svHtml() {
   const db = openDb();
-  const rows = db.prepare("SELECT * FROM tips WHERE source=? ORDER BY match_date DESC, kickoff").all(SV_SOURCE);
+  const rows = db.prepare(
+    "SELECT * FROM tips WHERE source=? ORDER BY CASE WHEN result IS NULL OR result='pending' THEN 0 ELSE 1 END, match_date ASC, kickoff ASC"
+  ).all(SV_SOURCE);
   db.close();
   if (!rows.length) return `<!doctype html><html lang="de"><head><meta charset="utf-8"><title>SoccerVista Tracker</title></head><body><p>Noch keine Daten. Erst <code>node track.mjs collect soccervista</code> ausführen.</p></body></html>`;
 
