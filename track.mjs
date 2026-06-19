@@ -19,7 +19,7 @@ import { normalizeMarket, evalTip, tipLabel } from './lib/markets.mjs';
 import { toUnits, aggregate, marketStats } from './lib/stats.mjs';
 import { today } from './lib/parse.mjs';
 import { resolveResult, findApiFixture } from './lib/results.mjs';
-import { referenceOdds } from './lib/odds.mjs';
+import { referenceOdds, referenceOddsFallback } from './lib/odds.mjs';
 import { ADAPTERS } from './adapters/index.mjs';
 
 const byId = (id) => ADAPTERS.find((a) => a.id === id);
@@ -96,11 +96,19 @@ async function fillOdds() {
     const ck = `${t.match_date}|${t.home}|${t.away}`;
     let fx = fxCache.get(ck);
     if (fx === undefined) { fx = await findApiFixture(t.home, t.away, t.match_date); fxCache.set(ck, fx); }
-    if (!fx) { console.log(`  ? ${t.home} vs ${t.away}: kein API-Spiel`); miss++; continue; }
-    let ro = null; try { ro = await referenceOdds(fx.id, t.market, fx.swapped); } catch {}
+    // 1) API-Football (Bet365 / erster verfügbarer Buchmacher)
+    let ro = null, src = '';
+    if (fx) {
+      try { ro = await referenceOdds(fx.id, t.market, fx.swapped); if (ro) src = 'APIfootball'; } catch {}
+    }
+    // 2) Fallback: The Odds API (1xBet bevorzugt) wenn API-Football keine Quote liefert
+    if (ro == null) {
+      try { ro = await referenceOddsFallback(t.home, t.away, t.match_date, t.market); if (ro) src = 'OddsAPI/1xBet'; } catch {}
+    }
+    if (!fx && ro == null) { console.log(`  ? ${t.home} vs ${t.away}: kein API-Spiel, kein OddsAPI-Treffer`); miss++; continue; }
     if (ro == null) { console.log(`  – ${t.home} vs ${t.away} [${tipLabel(t.market)}]: keine Marktquote`); miss++; continue; }
-    upd.run(ro, fx.id, t.id);
-    console.log(`  ✓ [${t.source}] ${t.home} vs ${t.away} · ${tipLabel(t.market)} -> Ref @${ro} (Eigenquote ${t.odds ?? '–'})`);
+    upd.run(ro, fx?.id ?? null, t.id);
+    console.log(`  ✓ [${t.source}] ${t.home} vs ${t.away} · ${tipLabel(t.market)} -> Ref @${ro} [${src}] (Eigenquote ${t.odds ?? '–'})`);
     done++;
   }
   console.log(`\nFertig: ${done} Referenzquoten gesetzt, ${miss} ohne.`);
