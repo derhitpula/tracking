@@ -6,6 +6,7 @@
   "description": "Multi-Source Fußball-Tipp-Tracker (Sammeln + Auswerten)",
   "engines": { "node": ">=22.5" },
   "optionalDependencies": {
+    "patchright": "^0.4.40",
     "playwright": "^1.47.0",
     "playwright-extra": "^4.3.6",
     "puppeteer-extra-plugin-stealth": "^2.11.2"
