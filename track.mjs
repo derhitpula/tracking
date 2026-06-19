@@ -201,6 +201,7 @@ try {
   switch (cmd) {
     case undefined:
     case 'collect': await collect(args[0]); break;
+    case 'prefetch': await prefetchBetmonitor(); console.log('Betmonitor gecacht.'); break;
     case 'odds': await fillOdds(); break;
     case 'results': await results(); break;
     case 'update': await collect(args[0]); await fillOdds(); await results(); break;

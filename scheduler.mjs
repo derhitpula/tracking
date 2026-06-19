@@ -38,6 +38,21 @@ if (/^(1|true|yes|on)$/i.test(process.env.ENABLE_DASHBOARD || '')) {
   console.log(`[${ts()}] Dashboard deaktiviert (headless). Report via: docker compose exec tracker node track.mjs report`);
 }
 
+// Betmonitor täglich um Mitternacht UTC vorwärmen bevor Spiele starten.
+// Läuft zusätzlich zum normalen collect, damit frühe australische/asiatische
+// Matches immer gecacht sind – unabhängig vom collect-Startzeitpunkt.
+function scheduleMidnightPrefetch() {
+  const now = new Date();
+  const midnight = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + 1));
+  const msUntil = midnight - now;
+  console.log(`[${ts()}] Betmonitor-Prefetch um Mitternacht UTC in ${Math.round(msUntil / 60000)} min`);
+  setTimeout(() => {
+    run('prefetch');
+    setInterval(() => run('prefetch'), 24 * H);
+  }, msUntil);
+}
+scheduleMidnightPrefetch();
+
 // Erststart sofort, dann in Intervallen (versetzt, damit collect -> odds -> results).
 loop('collect', COLLECT_EVERY);
 setTimeout(() => loop('odds', COLLECT_EVERY), 30 * 1000);   // Referenzquoten nach collect
