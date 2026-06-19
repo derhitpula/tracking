@@ -91,7 +91,7 @@ function svHtml() {
       ? `<b class="odd">${t.ref_odds}</b>`
       : `<span class="muted">—</span>`;
     const kt = kickoffTime(t.kickoff);
-    return `<tr><td class="nowrap">${deDate(t.match_date)}${kt ? `<br><span class="kt">${kt}</span>` : ''}</td>` +
+    return `<tr><td class="nowrap">${deDate(t.match_date)}${kt ? ` <span class="kt">${kt}</span>` : ''}</td>` +
       `<td class="match">${esc(t.home)} <span class="vs">vs</span> ${esc(t.away)}${sc}</td>` +
       `<td><span class="tip">${esc(tipLabel(t.market) || t.market_raw || '?')}</span></td>` +
       `<td>${oddCell}</td><td>${pill(r)}</td></tr>`;
@@ -220,7 +220,7 @@ function sv2Html() {
       ? `<b class="odd">${refOdds}</b>${ownOdds != null && ownOdds !== refOdds ? ` <span class="muted own">(${ownOdds})</span>` : ''}`
       : (ownOdds != null ? `<span class="odd">${ownOdds}</span>` : '<span class="muted">—</span>');
     const kt = kickoffTime(t.kickoff);
-    return `<tr><td class="nowrap">${deDate(t.match_date)}${kt ? `<br><span class="kt">${kt}</span>` : ''}</td>` +
+    return `<tr><td class="nowrap">${deDate(t.match_date)}${kt ? ` <span class="kt">${kt}</span>` : ''}</td>` +
       `<td class="match">${esc(t.home)} <span class="vs">vs</span> ${esc(t.away)}${sc}</td>` +
       `<td><span class="tip">${esc(tipLabel(t.market) || t.market_raw || '?')}</span></td>` +
       `<td>${oddCell}</td><td>${pill(r)}</td></tr>`;
@@ -324,7 +324,7 @@ function html() {
   const comboRows = combos.map((c) => {
     const legs = c.legs.map((l) => `<span class="leg">${esc(l.home)} / ${esc(l.away)} · <b>${esc(tipLabel(l.market || l.market_raw))}</b></span>`).join('<span class="plus">+</span>');
     const ckt = kickoffTime(c.kickoff);
-    return `<tr><td class="nowrap">${deDate(c.match_date)}${ckt ? `<br><span class="kt">${ckt}</span>` : ''}</td><td>${srcBadge(c.source)}</td>` +
+    return `<tr><td class="nowrap">${deDate(c.match_date)}${ckt ? ` <span class="kt">${ckt}</span>` : ''}</td><td>${srcBadge(c.source)}</td>` +
       `<td><span class="badge type">${esc(c.slip_type)}</span></td><td class="legs">${legs}</td>` +
       `<td class="odd">${c.odds ?? ''}</td><td>${pill(c.result)}</td></tr>`;
   }).join('');
@@ -337,7 +337,7 @@ function html() {
       ? `<b class="odd">${t.ref_odds}</b>${t.odds != null && t.odds !== t.ref_odds ? ` <span class="muted own">(${t.odds})</span>` : ''}`
       : (t.odds != null ? `<span class="odd">${t.odds}</span>` : '<span class="muted">–</span>');
     const kt = kickoffTime(t.kickoff);
-    return `<tr><td class="nowrap">${deDate(t.match_date)}${kt ? `<br><span class="kt">${kt}</span>` : ''}</td><td>${srcBadge(t.source)}</td>` +
+    return `<tr><td class="nowrap">${deDate(t.match_date)}${kt ? ` <span class="kt">${kt}</span>` : ''}</td><td>${srcBadge(t.source)}</td>` +
       `<td class="match">${esc(t.home)} <span class="vs">vs</span> ${esc(t.away)}${sc}</td>` +
       `<td><span class="tip">${esc(t.market_raw || tipLabel(t.market) || '?')}</span></td>` +
       `<td>${oddCell}</td><td>${pill(r)}</td></tr>`;
