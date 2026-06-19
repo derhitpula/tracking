@@ -16,6 +16,7 @@ import './lib/env.mjs'; // .env laden (für nativen Betrieb ohne Docker)
 import { openDb, upsertTip, dayOf, nowIso } from './lib/db.mjs';
 import { fetchHtml, sleep } from './lib/fetch.mjs';
 import { normalizeMarket, evalTip, tipLabel } from './lib/markets.mjs';
+import { toUnits, aggregate, marketStats } from './lib/stats.mjs';
 import { today } from './lib/parse.mjs';
 import { resolveResult } from './lib/results.mjs';
 import { ADAPTERS } from './adapters/index.mjs';
@@ -88,28 +89,21 @@ function report() {
   const db = openDb();
   const rows = db.prepare('SELECT * FROM tips').all();
   if (!rows.length) { console.log('Noch keine Daten. Erst `node track.mjs collect`.'); db.close(); return; }
-  const blank = () => ({ won: 0, lost: 0, void: 0, pending: 0, unknown: 0, stake: 0, ret: 0 });
-  const add = (s, r, odds) => {
-    s[r] = (s[r] ?? 0) + 1;
-    if (r === 'won' || r === 'lost' || r === 'void') {
-      s.stake++; s.ret += r === 'won' ? (odds || 0) : r === 'void' ? 1 : 0;
-    }
-  };
-  const overall = blank(), bySource = new Map(), byMarket = new Map();
-  const slot = (m, k) => { if (!m.has(k)) m.set(k, blank()); return m.get(k); };
-  for (const t of rows) {
-    const r = t.result || 'pending';
-    add(overall, r, t.odds); add(slot(bySource, t.source), r, t.odds);
-    if (t.market) add(slot(byMarket, tipLabel(t.market)), r, t.odds);
-  }
+  const units = toUnits(rows);
+  const { overall, bySource } = aggregate(units);
+  const byMarket = marketStats(rows);
+
   const line = '─'.repeat(70);
   console.log(`\n${line}\n  MULTI-SOURCE TIPP-TRACKER – AUSWERTUNG\n${line}`);
   const dates = rows.map((t) => t.match_date).filter(Boolean).sort();
-  console.log(`  Zeitraum ${dates[0] ?? '?'} … ${dates.at(-1) ?? '?'}   Tipps gesamt: ${rows.length}`);
+  const combos = units.filter((u) => u.kind === 'combo').length;
+  console.log(`  Zeitraum ${dates[0] ?? '?'} … ${dates.at(-1) ?? '?'}   ` +
+    `${rows.length} Selektionen · ${units.length} Wetten (${combos} Kombis)`);
   const settled = overall.won + overall.lost + overall.void;
-  console.log(`\n  GESAMT: abgerechnet ${settled} · offen ${overall.pending} · nicht auswertbar ${overall.unknown}`);
+  console.log(`\n  GESAMT (1 Einheit je Wette): abgerechnet ${settled} · offen ${overall.pending}`);
   console.log(`  Treffer ${overall.won}/${overall.won + overall.lost} (${pct(overall.won, overall.won + overall.lost)}) · ` +
-    `Einsatz ${overall.stake.toFixed(2)} · Gewinn ${signed(overall.ret - overall.stake)} · ROI ${roi(overall)}`);
+    `Einsatz ${overall.stake.toFixed(2)} · Gewinn ${signed(overall.ret - overall.stake)} · ROI ${roi(overall)}` +
+    (overall.noOdds ? ` · ${overall.noOdds} ohne Quote (nicht im ROI)` : ''));
 
   console.log(`\n  ── NACH QUELLE ──────────────────────────────────────────────────`);
   console.log(`  ${'Quelle'.padEnd(22)} ${'Treffer'.padStart(9)} ${'Quote'.padStart(7)} ${'ROI'.padStart(8)}  offen`);
@@ -117,9 +111,21 @@ function report() {
     const st = s.won + s.lost;
     console.log(`  ${k.padEnd(22)} ${`${s.won}/${st}`.padStart(9)} ${pct(s.won, st).padStart(7)} ${roi(s).padStart(8)}  ${s.pending}`);
   }
+
+  // Kombis einzeln auflisten (BetMines Daily Double/Risk etc.)
+  const comboUnits = units.filter((u) => u.kind === 'combo');
+  if (comboUnits.length) {
+    console.log(`\n  ── KOMBIS ───────────────────────────────────────────────────────`);
+    for (const c of comboUnits) {
+      const legs = c.legs.map((l) => `${l.home}/${l.away} ${tipLabel(l.market || l.market_raw)}`).join(' + ');
+      console.log(`  [${c.source}] ${c.slip_type} @${c.odds ?? '?'} · ${c.result.toUpperCase()}`);
+      console.log(`      ${legs}`);
+    }
+  }
+
   const mk = [...byMarket].map(([k, s]) => ({ k, st: s.won + s.lost, s })).filter((x) => x.st).sort((a, b) => b.st - a.st);
   if (mk.length) {
-    console.log(`\n  ── NACH MARKT ───────────────────────────────────────────────────`);
+    console.log(`\n  ── NACH MARKT (Selektions-Ebene) ────────────────────────────────`);
     for (const { k, st, s } of mk) console.log(`  ${k.padEnd(22)} ${`${s.won}/${st}`.padStart(9)} ${pct(s.won, st).padStart(7)} ${roi(s).padStart(8)}`);
   }
   console.log(line + '\n');
