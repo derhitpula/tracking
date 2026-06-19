@@ -25,9 +25,10 @@ export default {
           if (!home || !away) continue;
           const kickoff   = m.date_iso || null;
           const match_date = kickoff ? kickoff.slice(0, 10) : new Date().toISOString().slice(0, 10);
-          const market_raw = g.selection?.name || g.market?.name || '';
-          const odds = g.selection?.odds ?? g.selection?.decimalOdds ?? g.odds ?? null;
-          tips.push({ home, away, market_raw, match_date, kickoff, odds });
+          // headline = vollständiger Tipp ("Germany Win & Over 2.5"); name ist
+          // abgekürzt ("Germany & Over"). Quote liefert die Seite nicht.
+          const market_raw = g.selection?.headline || g.market?.name || g.selection?.name || '';
+          tips.push({ home, away, market_raw, match_date, kickoff, odds: null });
         }
       }
     } catch { /* JSON-Fehler ignorieren */ }
