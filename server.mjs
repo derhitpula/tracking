@@ -417,10 +417,16 @@ tbody tr:hover{background:var(--panel2)}
 
 footer{color:var(--muted);margin-top:34px;font-size:11.5px;line-height:1.6;
   border-top:1px solid var(--line);padding-top:16px}
+.nav{display:flex;gap:8px;flex-wrap:wrap;margin-top:4px}
+.nav a{font-size:12px;color:var(--muted);text-decoration:none;padding:4px 12px;border:1px solid var(--line);border-radius:6px}
+.nav a:hover{color:var(--txt);border-color:var(--accent)}
 .scroll{overflow-x:auto}
 </style></head><body><div class="wrap">
 <header>
-  <h1><span class="logo">⚽</span> Tipp-Tracker</h1>
+  <div>
+    <h1><span class="logo">⚽</span> Tipp-Tracker</h1>
+    <nav class="nav"><a href="/soccervista">SoccerVista</a><a href="/soccervital">SoccerVital</a></nav>
+  </div>
   <div class="sub">${deDate(dates[0])} – ${deDate(dates.at(-1))} · <b>${sources.size}</b> Quellen · <b>${rows.length}</b> Selektionen · <b>${units.length}</b> Wetten (${combos.length} Kombis)<br>aktualisiert ${new Date().toLocaleString('de-DE')}</div>
 </header>
 
