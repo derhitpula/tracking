@@ -97,7 +97,7 @@ async function fillOdds() {
     let fx = fxCache.get(ck);
     if (fx === undefined) { fx = await findApiFixture(t.home, t.away, t.match_date); fxCache.set(ck, fx); }
     if (!fx) { console.log(`  ? ${t.home} vs ${t.away}: kein API-Spiel`); miss++; continue; }
-    let ro = null; try { ro = await referenceOdds(fx.id, t.market); } catch {}
+    let ro = null; try { ro = await referenceOdds(fx.id, t.market, fx.swapped); } catch {}
     if (ro == null) { console.log(`  – ${t.home} vs ${t.away} [${tipLabel(t.market)}]: keine Marktquote`); miss++; continue; }
     upd.run(ro, fx.id, t.id);
     console.log(`  ✓ [${t.source}] ${t.home} vs ${t.away} · ${tipLabel(t.market)} -> Ref @${ro} (Eigenquote ${t.odds ?? '–'})`);
