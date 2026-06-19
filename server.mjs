@@ -12,8 +12,14 @@ const roiNum = (s) => (s.stake ? 100 * (s.ret - s.stake) / s.stake : null);
 const esc = (s) => String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 // YYYY-MM-DD -> TT.MM.JJJJ (deutsches Datumsformat)
 const deDate = (iso) => { const m = String(iso ?? '').match(/^(\d{4})-(\d{2})-(\d{2})/); return m ? `${m[3]}.${m[2]}.${m[1]}` : (iso ?? '?'); };
-// ISO-Kickoff -> HH:MM (UTC)
-const kickoffTime = (iso) => { const m = String(iso ?? '').match(/T(\d{2}):(\d{2})/); return m ? `${m[1]}:${m[2]}` : ''; };
+// ISO-Kickoff -> HH:MM in UTC+2 (CEST)
+const kickoffTime = (iso) => {
+  if (!iso) return '';
+  const m = String(iso).match(/T(\d{2}):(\d{2})/);
+  if (!m) return '';
+  const h = (parseInt(m[1]) + 2) % 24;
+  return `${String(h).padStart(2, '0')}:${m[2]}`;
+};
 
 // Stabile Farbe je Quelle (HSL aus Namens-Hash)
 function srcColor(name) {
@@ -56,7 +62,7 @@ const SV2_SOURCE = 'soccervital';
 function svHtml() {
   const db = openDb();
   const rows = db.prepare(
-    "SELECT * FROM tips WHERE source=? ORDER BY CASE WHEN result IS NULL OR result='pending' THEN 0 ELSE 1 END, match_date ASC, kickoff ASC"
+    "SELECT * FROM tips WHERE source=? ORDER BY match_date ASC, CASE WHEN kickoff IS NULL THEN 1 ELSE 0 END, kickoff ASC"
   ).all(SV_SOURCE);
   db.close();
   if (!rows.length) return `<!doctype html><html lang="de"><head><meta charset="utf-8"><title>SoccerVista Tracker</title></head><body><p>Noch keine Daten. Erst <code>node track.mjs collect soccervista</code> ausführen.</p></body></html>`;
@@ -184,7 +190,7 @@ footer{color:var(--muted);margin-top:30px;font-size:11px;line-height:1.6;border-
 function sv2Html() {
   const db = openDb();
   const rows = db.prepare(
-    "SELECT * FROM tips WHERE source=? ORDER BY CASE WHEN result IS NULL OR result='pending' THEN 0 ELSE 1 END, match_date ASC, kickoff ASC"
+    "SELECT * FROM tips WHERE source=? ORDER BY match_date ASC, CASE WHEN kickoff IS NULL THEN 1 ELSE 0 END, kickoff ASC"
   ).all(SV2_SOURCE);
   db.close();
   if (!rows.length) return `<!doctype html><html lang="de"><head><meta charset="utf-8"><title>SoccerVital Tracker</title></head><body><p>Noch keine Daten. Erst <code>node track.mjs collect soccervital</code> ausführen.</p></body></html>`;
