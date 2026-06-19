@@ -41,7 +41,7 @@ export default {
       let kickoff = null;
       if (tm) {
         let h = parseInt(tm[1]);
-        if (/pm/i.test(tm[3]) && h !== 12) h += 12;
+        if (/pm/i.test(tm[3]) && h < 12) h += 12;
         else if (/am/i.test(tm[3]) && h === 12) h = 0;
         kickoff = `${todayDate}T${String(h).padStart(2, '0')}:${tm[2]}:00Z`;
       }
