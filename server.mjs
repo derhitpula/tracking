@@ -9,6 +9,8 @@ const pct = (n, d) => (d ? `${(100 * n / d).toFixed(1)}%` : '–');
 const signed = (n) => (n >= 0 ? '+' : '') + n.toFixed(2);
 const roiOf = (s) => (s.stake ? signed(100 * (s.ret - s.stake) / s.stake) + '%' : '–');
 const esc = (s) => String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+// YYYY-MM-DD -> TT.MM.JJJJ (deutsches Datumsformat)
+const deDate = (iso) => { const m = String(iso ?? '').match(/^(\d{4})-(\d{2})-(\d{2})/); return m ? `${m[3]}.${m[2]}.${m[1]}` : (iso ?? '?'); };
 
 function row(name, s) {
   const st = s.won + s.lost;
@@ -31,7 +33,7 @@ function html() {
   // Kombis (BetMines Daily Double/Risk etc.)
   const comboRows = combos.map((c) => {
     const legs = c.legs.map((l) => `${esc(l.home)}/${esc(l.away)} ${esc(tipLabel(l.market || l.market_raw))}`).join(' + ');
-    return `<tr class="r-${c.result}"><td>${esc(c.match_date)}</td><td>${esc(c.source)}</td>` +
+    return `<tr class="r-${c.result}"><td>${deDate(c.match_date)}</td><td>${esc(c.source)}</td>` +
       `<td>${esc(c.slip_type)}</td><td>${legs}</td><td>${c.odds ?? ''}</td><td><b>${c.result}</b></td></tr>`;
   }).join('');
 
@@ -43,7 +45,7 @@ function html() {
     const oddCell = t.ref_odds != null
       ? `<b>${t.ref_odds}</b>${t.odds != null && t.odds !== t.ref_odds ? ` <span style="color:#667">(${t.odds})</span>` : ''}`
       : (t.odds ?? '–');
-    return `<tr class="r-${r}"><td>${esc(t.match_date)}</td><td>${esc(t.source)}</td>` +
+    return `<tr class="r-${r}"><td>${deDate(t.match_date)}</td><td>${esc(t.source)}</td>` +
       `<td>${esc(t.home)} vs ${esc(t.away)}${sc}</td><td>${esc(t.market_raw || '?')}</td>` +
       `<td>${oddCell}</td><td><b>${r}</b></td></tr>`;
   }).join('');
@@ -69,7 +71,7 @@ th{background:#1d2230;color:#9aa7bd;font-weight:600}
 footer{color:#667;margin-top:24px;font-size:11px}
 </style></head><body><div class="wrap">
 <h1>⚽ Multi-Source Tipp-Tracker</h1>
-<div class="sub">Zeitraum ${dates[0] ?? '?'} … ${dates.at(-1) ?? '?'} · ${rows.length} Selektionen · ${units.length} Wetten (${combos.length} Kombis) · aktualisiert ${new Date().toLocaleString('de-DE')}</div>
+<div class="sub">Zeitraum ${deDate(dates[0])} … ${deDate(dates.at(-1))} · ${rows.length} Selektionen · ${units.length} Wetten (${combos.length} Kombis) · aktualisiert ${new Date().toLocaleString('de-DE')}</div>
 <div class="cards">
 <div class="card"><div class="v">${overall.won}/${overall.won + overall.lost}</div><div class="l">Treffer (${pct(overall.won, overall.won + overall.lost)})</div></div>
 <div class="card"><div class="v ${overall.stake && overall.ret - overall.stake >= 0 ? 'pos' : 'neg'}">${roiOf(overall)}</div><div class="l">ROI (1u je Wette)</div></div>
