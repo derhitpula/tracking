@@ -3,7 +3,15 @@
 // Endpoint: /events/by/date/{d-m-Y}/ → Array von Ligen mit Spielen + Prognosen.
 // Kriterium: predictionPoints === 10 (maximale Konfidenz) + nicht abgesagt/verlegt.
 // Market: prediction1x2 → '1' / 'X' / '2' (direkte Market-Codes).
+//
+// Blocklist: Ligen die SoccerVista im JS clientseitig ausfiltert (nicht auf der Predictions-Seite).
+// tournamentTemplateId aus dem /events/by/date/ Endpoint.
 import { UA } from '../lib/fetch.mjs';
+
+const LEAGUE_BLOCKLIST = new Set([
+  '21McUfjf', // USL League Two (US-Amateur)
+  'ATL2voyk', // Niger Super Ligue
+]);
 
 export default {
   id: 'soccervista',
@@ -29,8 +37,9 @@ export default {
     if (!Array.isArray(data)) return [];
     const tips = [];
     for (const league of data) {
+      if (LEAGUE_BLOCKLIST.has(league.tournamentTemplateId)) continue;
       for (const ev of (league.events || [])) {
-        if (ev.isCancelled || ev.isPostponed || ev.isFinished) continue;
+        if (ev.isCancelled || ev.isPostponed) continue;
         if (ev.prediction1x2 == null || ev.predictionPoints !== 10) continue;
         const market = String(ev.prediction1x2); // '1', 'X', '2'
         const winner = market === '1' ? ev.homeTeam : market === '2' ? ev.awayTeam : null;
