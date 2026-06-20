@@ -7,18 +7,37 @@ und wertet sie aus (Trefferquote, ROI – je Quelle und je Markt). Reines Node.j
 > Das ältere Einzeltool `betmines.mjs` (nur BetMines, mit eigener `data/betmines.db`)
 > bleibt funktionsfähig. Das neue, übergreifende Tool ist **`track.mjs`**.
 
+## Datenfluss
+
+```
+Scraper → raw_tips → Match-Mapping → tips → settlements → Dashboard
+```
+
+Relationales Schema (`data/tips.db`): `sources`, `tipsters`, `matches` (zentral – ein
+Spiel je Begegnung, Stammdaten + Endstand aus der API), `raw_tips` (Roh-Audit),
+`tips` (normalisiert, kanonische Markt-Codes), `settlements` (Abrechnung/ROI).
+Ein Spiel wird einmal über alle Quellen hinweg per Fuzzy-Match zusammengeführt.
+
 ## Befehle
 
 ```bash
-node track.mjs collect [quelle]   # Tipps sammeln (alle Quellen oder nur eine)
-node track.mjs results            # offene Tipps: Endstände holen & auswerten
-node track.mjs update [quelle]    # collect + results
-node track.mjs report             # Auswertung mit Quellen-/Markt-Vergleich
+node track.mjs daily [quelle]     # voller Tagesablauf: collect+prune+enrich+odds+closing+settle
+node track.mjs collect [quelle]   # nur Tipps sammeln (-> raw_tips/tips)
+node track.mjs enrich             # Spiele gegen Ergebnis-API anreichern (Anstoß/Status/Endstand)
+node track.mjs settle             # fertige Spiele auswerten -> settlements
+node track.mjs odds               # einheitliche Referenzquoten je Tipp
+node track.mjs closing            # Schlussquote bei Anpfiff einfrieren (CLV)
+node track.mjs prune              # veraltete/nicht auswertbare Tipps entfernen
+node track.mjs report             # Auswertung je Quelle (Trefferquote, ROI)
 node track.mjs list [--source x] [--date YYYY-MM-DD] [--pending]
 node track.mjs sources            # verfügbare Quellen anzeigen
 ```
 
-Daten: `data/tips.db`. Ergebnis-Cache: `data/results_cache/`.
+Im Dauerbetrieb übernimmt `scheduler.mjs` (`npm start`) den `daily`-Lauf periodisch,
+zieht Endstände stündlich nach und hostet das Dashboard. Markt-Codes sind kanonisch
+(`OVER_2_5`, `HOME_WIN`, `BTTS_YES` …); neue Märkte = neues Modul in `lib/settlers/`.
+
+Daten: `data/tips.db`. Ergebnis-/Quoten-Cache: `data/results_cache/`.
 
 ## Quellen (Adapter)
 
