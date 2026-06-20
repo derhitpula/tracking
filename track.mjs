@@ -1,241 +1,98 @@
 #!/usr/bin/env node
-// Multi-Source Tipp-Tracker
-// -----------------------------------------------------------------------------
-// Sammelt tägliche Fußball-Tipps von mehreren Seiten in eine gemeinsame DB und
-// wertet sie aus. Ergebnisse: BetMines über seine Match-Seiten, alle anderen
-// über eine unabhängige Ergebnis-API (results.mjs).
+// Multi-Source Tipp-Tracker – CLI.
+// Datenfluss: Scraper -> raw_tips -> match-mapping -> tips -> settlements.
 //
-//   node track.mjs collect [quelle]   Tipps sammeln (alle oder eine Quelle)
-//   node track.mjs results            offene Tipps: Endstände holen & auswerten
-//   node track.mjs update [quelle]     collect + results
-//   node track.mjs report             Auswertung mit Quellen-Vergleich
-//   node track.mjs list [--source x] [--date YYYY-MM-DD] [--pending]
-//   node track.mjs sources            verfügbare Quellen anzeigen
-// -----------------------------------------------------------------------------
-import './lib/env.mjs'; // .env laden (für nativen Betrieb ohne Docker)
-import { openDb, upsertTip, dayOf, nowIso } from './lib/db.mjs';
-import { fetchHtml, sleep } from './lib/fetch.mjs';
-import { normalizeMarket, evalTip, tipLabel } from './lib/markets.mjs';
-import { toUnits, aggregate, marketStats } from './lib/stats.mjs';
-import { today } from './lib/parse.mjs';
-import { resolveResult, findApiFixture, findKickoff } from './lib/results.mjs';
-import { referenceOdds, referenceOddsFallback } from './lib/odds.mjs';
-import { prefetchToday as prefetchBetmonitor } from './lib/betmonitor.mjs';
+//   node track.mjs daily [quelle]    voller Tagesablauf (collect+prune+enrich+odds+settle)
+//   node track.mjs collect [quelle]  nur Tipps sammeln
+//   node track.mjs enrich            Spiele gegen Ergebnis-API anreichern
+//   node track.mjs settle            fertige Spiele auswerten
+//   node track.mjs odds              Referenzquoten holen
+//   node track.mjs prune             veraltete Tipps entfernen
+//   node track.mjs report            Auswertung je Quelle
+//   node track.mjs list [--pending] [--source x] [--date YYYY-MM-DD]
+//   node track.mjs sources           verfügbare Quellen
+import './lib/env.mjs';
+import { openDb } from './lib/db.mjs';
+import { collect, enrich, settle, fillOdds, prune, daily } from './lib/pipeline.mjs';
+import { marketLabel } from './lib/markets.mjs';
 import { ADAPTERS } from './adapters/index.mjs';
 
-const byId = (id) => ADAPTERS.find((a) => a.id === id);
-
-// --- collect ----------------------------------------------------------------
-async function collect(sourceFilter) {
-  // Betmonitor-Cache sofort befüllen bevor Spiele starten (verschwindet nach Ankick)
-  prefetchBetmonitor().catch(() => {});
-  const db = openDb();
-  const list = sourceFilter ? [byId(sourceFilter)].filter(Boolean) : ADAPTERS;
-  if (!list.length) { console.log(`Unbekannte Quelle: ${sourceFilter}`); db.close(); return; }
-  for (const a of list) {
-    process.stdout.write(`• ${a.id.padEnd(22)} `);
-    try {
-      const html = a.fetch ? await a.fetch() : await fetchHtml(a.url);
-      const tips = (await a.parse(html)) || [];
-      let n = 0;
-      for (const t of tips) {
-        const norm = normalizeMarket(t.market_raw, t.home, t.away);
-        upsertTip(db, {
-          ...t, source: a.id, market: t.market ?? norm.code,
-          market_raw: t.market_raw ?? norm.raw,
-          match_date: t.match_date || dayOf(t.kickoff) || today(),
-        });
-        n++;
-      }
-      if (n === 0 && process.env.DEBUG_COLLECT) {
-        console.log(`0 Tipp(s)  ← HTML-Anfang: ${html.slice(0, 300).replace(/\s+/g, ' ')}`);
-      } else {
-        console.log(`${n} Tipp(s)`);
-      }
-    } catch (e) { console.log(`FEHLER: ${e.message}`); }
-    await sleep(600);
-  }
-  db.close();
-}
-
-// --- results ----------------------------------------------------------------
-async function results() {
-  const db = openDb();
-  const open = db.prepare(`SELECT * FROM tips
-    WHERE (result IS NULL OR result='pending') AND market IS NOT NULL
-    ORDER BY match_date, kickoff`).all()
-    .filter((t) => !t.kickoff || new Date(t.kickoff) <= new Date());
-  if (!open.length) { console.log('Keine offenen, auswertbaren Tipps mit angestoßenem Spiel.'); db.close(); return; }
-
-  const upd = db.prepare(`UPDATE tips SET ft_home=?, ft_away=?, ht_home=?, ht_away=?,
-    result=?, result_src=?, settled_at=? WHERE id=?`);
-  let done = 0, wait = 0, fail = 0;
-  console.log(`Prüfe ${open.length} offene Tipp(s) …\n`);
-  for (const t of open) {
-    const a = byId(t.source);
-    let r = null;
-    try { r = await resolveResult(t, a); }
-    catch (e) { console.log(`  ✗ ${t.home} vs ${t.away}: ${e.message}`); fail++; continue; }
-    if (!r || !r.ft) {
-      console.log(`  … ${t.home} vs ${t.away}: noch kein Endstand`); wait++; continue;
-    }
-    const res = evalTip(t.market, r.ft, r.ht) ?? 'unknown';
-    upd.run(r.ft[0], r.ft[1], r.ht?.[0] ?? null, r.ht?.[1] ?? null, res, r.src, nowIso(), t.id);
-    console.log(`  ✓ [${t.source}] ${t.home} ${r.ft[0]}-${r.ft[1]} ${t.away} · ${tipLabel(t.market)} -> ${res.toUpperCase()}`);
-    done++;
-  }
-  console.log(`\nFertig: ${done} ausgewertet, ${wait} offen, ${fail} fehlgeschlagen.`);
-  db.close();
-}
-
-// --- odds: einheitliche Referenzquoten je Spiel+Markt holen -----------------
-async function fillOdds() {
-  const db = openDb();
-  const open = db.prepare(`SELECT * FROM tips
-    WHERE ref_odds IS NULL AND market IS NOT NULL AND slip_ref IS NULL
-    ORDER BY match_date, source`).all();
-  if (!open.length) { console.log('Keine Tipps ohne Referenzquote.'); db.close(); return; }
-  const upd = db.prepare('UPDATE tips SET ref_odds=?, ref_fixture=? WHERE id=?');
-  const fxCache = new Map();
-  let done = 0, miss = 0;
-  console.log(`Hole Referenzquoten für ${open.length} Tipp(s) …\n`);
-  for (const t of open) {
-    const ck = `${t.match_date}|${t.home}|${t.away}`;
-    let fx = fxCache.get(ck);
-    if (fx === undefined) { fx = await findApiFixture(t.home, t.away, t.match_date); fxCache.set(ck, fx); }
-    // 1) API-Football (Bet365 / erster verfügbarer Buchmacher)
-    let ro = null, src = '';
-    if (fx) {
-      try { ro = await referenceOdds(fx.id, t.market, fx.swapped); if (ro) src = 'APIfootball'; } catch {}
-    }
-    // 2) Fallback: The Odds API (1xBet bevorzugt) wenn API-Football keine Quote liefert
-    if (ro == null) {
-      try { ro = await referenceOddsFallback(t.home, t.away, t.match_date, t.market); if (ro) src = 'OddsAPI/1xBet'; } catch {}
-    }
-    if (!fx && ro == null) { console.log(`  ? ${t.home} vs ${t.away}: kein API-Spiel, kein OddsAPI-Treffer`); miss++; continue; }
-    if (ro == null) { console.log(`  – ${t.home} vs ${t.away} [${tipLabel(t.market)}]: keine Marktquote`); miss++; continue; }
-    upd.run(ro, fx?.id ?? null, t.id);
-    console.log(`  ✓ [${t.source}] ${t.home} vs ${t.away} · ${tipLabel(t.market)} -> Ref @${ro} [${src}] (Eigenquote ${t.odds ?? '–'})`);
-    done++;
-  }
-  console.log(`\nFertig: ${done} Referenzquoten gesetzt, ${miss} ohne.`);
-  db.close();
-}
-
-// --- kickoff: fehlende Anstoßzeiten per API-Football nachfüllen --------------
-async function fillKickoff() {
-  const db = openDb();
-  const open = db.prepare(`SELECT * FROM tips WHERE kickoff IS NULL AND match_date IS NOT NULL ORDER BY match_date, source`).all();
-  if (!open.length) { console.log('Keine Tipps ohne Anstoßzeit.'); db.close(); return; }
-  const upd = db.prepare('UPDATE tips SET kickoff=? WHERE id=?');
-  const koCache = new Map();
-  let done = 0, miss = 0;
-  console.log(`Hole Anstoßzeiten für ${open.length} Tipp(s) …\n`);
-  for (const t of open) {
-    const ck = `${t.match_date}|${t.home}|${t.away}`;
-    let ko = koCache.get(ck);
-    if (ko === undefined) { ko = await findKickoff(t.home, t.away, t.match_date); koCache.set(ck, ko); }
-    if (!ko) { console.log(`  ? [${t.source}] ${t.home} vs ${t.away}: kein Fixture`); miss++; continue; }
-    upd.run(ko, t.id);
-    console.log(`  ✓ [${t.source}] ${t.home} vs ${t.away}: ${ko}`);
-    done++;
-    await sleep(200);
-  }
-  console.log(`\nFertig: ${done} Anstoßzeiten gesetzt, ${miss} ohne.`);
-  db.close();
-}
-
-// --- report -----------------------------------------------------------------
 const pct = (n, d) => (d ? `${(100 * n / d).toFixed(1)}%` : '–');
 const signed = (n) => (n >= 0 ? '+' : '') + n.toFixed(2);
-const roi = (s) => (s.stake ? signed(100 * (s.ret - s.stake) / s.stake) + '%' : '–');
+const deDate = (iso) => { const m = String(iso ?? '').match(/^(\d{4})-(\d{2})-(\d{2})/); return m ? `${m[3]}.${m[2]}.${m[1]}` : '?'; };
 
-function report() {
-  const db = openDb();
-  const rows = db.prepare('SELECT * FROM tips').all();
-  if (!rows.length) { console.log('Noch keine Daten. Erst `node track.mjs collect`.'); db.close(); return; }
-  const units = toUnits(rows);
-  const { overall, bySource } = aggregate(units);
-  const byMarket = marketStats(rows);
+function report(db) {
+  const rows = db.prepare(`
+    SELECT s.key AS src,
+      SUM(CASE WHEN st.result='won'  THEN 1 ELSE 0 END) AS won,
+      SUM(CASE WHEN st.result='lost' THEN 1 ELSE 0 END) AS lost,
+      SUM(CASE WHEN st.result='void' THEN 1 ELSE 0 END) AS void,
+      SUM(CASE WHEN st.tip_id IS NULL THEN 1 ELSE 0 END) AS pending,
+      SUM(COALESCE(st.profit_units,0)) AS profit,
+      SUM(CASE WHEN st.tip_id IS NOT NULL THEN COALESCE(t.odds,0) ELSE 0 END) AS staked
+    FROM tips t JOIN sources s ON s.id=t.source_id
+    LEFT JOIN settlements st ON st.tip_id=t.id
+    GROUP BY s.key ORDER BY (won+lost) DESC, src`).all();
+  if (!rows.length) { console.log('Noch keine Daten. Erst `node track.mjs daily`.'); return; }
 
-  const line = '─'.repeat(70);
-  console.log(`\n${line}\n  MULTI-SOURCE TIPP-TRACKER – AUSWERTUNG\n${line}`);
-  const dates = rows.map((t) => t.match_date).filter(Boolean).sort();
-  const combos = units.filter((u) => u.kind === 'combo').length;
-  console.log(`  Zeitraum ${dates[0] ?? '?'} … ${dates.at(-1) ?? '?'}   ` +
-    `${rows.length} Selektionen · ${units.length} Wetten (${combos} Kombis)`);
-  const settled = overall.won + overall.lost + overall.void;
-  console.log(`\n  GESAMT (1 Einheit je Wette): abgerechnet ${settled} · offen ${overall.pending}`);
-  console.log(`  Treffer ${overall.won}/${overall.won + overall.lost} (${pct(overall.won, overall.won + overall.lost)}) · ` +
-    `Einsatz ${overall.stake.toFixed(2)} · Gewinn ${signed(overall.ret - overall.stake)} · ROI ${roi(overall)}` +
-    (overall.noOdds ? ` · ${overall.noOdds} ohne Quote (nicht im ROI)` : ''));
-
-  console.log(`\n  ── NACH QUELLE ──────────────────────────────────────────────────`);
-  console.log(`  ${'Quelle'.padEnd(22)} ${'Treffer'.padStart(9)} ${'Quote'.padStart(7)} ${'ROI'.padStart(8)}  offen`);
-  for (const [k, s] of [...bySource].sort((a, b) => (b[1].won + b[1].lost) - (a[1].won + a[1].lost))) {
-    const st = s.won + s.lost;
-    console.log(`  ${k.padEnd(22)} ${`${s.won}/${st}`.padStart(9)} ${pct(s.won, st).padStart(7)} ${roi(s).padStart(8)}  ${s.pending}`);
+  const line = '─'.repeat(72);
+  console.log(`\n${line}\n  TIPP-TRACKER – AUSWERTUNG JE QUELLE\n${line}`);
+  console.log(`  ${'Quelle'.padEnd(22)} ${'Treffer'.padStart(9)} ${'Quote'.padStart(7)} ${'Gewinn'.padStart(9)} ${'ROI'.padStart(8)}  offen`);
+  let twon = 0, tlost = 0, tprofit = 0, tsettled = 0;
+  for (const r of rows) {
+    const st = r.won + r.lost;
+    const roi = st ? signed(100 * r.profit / st) + '%' : '–';
+    console.log(`  ${r.src.padEnd(22)} ${`${r.won}/${st}`.padStart(9)} ${pct(r.won, st).padStart(7)} ${signed(r.profit).padStart(9)} ${roi.padStart(8)}  ${r.pending}`);
+    twon += r.won; tlost += r.lost; tprofit += r.profit; tsettled += st;
   }
-
-  // Kombis einzeln auflisten (BetMines Daily Double/Risk etc.)
-  const comboUnits = units.filter((u) => u.kind === 'combo');
-  if (comboUnits.length) {
-    console.log(`\n  ── KOMBIS ───────────────────────────────────────────────────────`);
-    for (const c of comboUnits) {
-      const legs = c.legs.map((l) => `${l.home}/${l.away} ${tipLabel(l.market || l.market_raw)}`).join(' + ');
-      console.log(`  [${c.source}] ${c.slip_type} @${c.odds ?? '?'} · ${c.result.toUpperCase()}`);
-      console.log(`      ${legs}`);
-    }
-  }
-
-  const mk = [...byMarket].map(([k, s]) => ({ k, st: s.won + s.lost, s })).filter((x) => x.st).sort((a, b) => b.st - a.st);
-  if (mk.length) {
-    console.log(`\n  ── NACH MARKT (Selektions-Ebene) ────────────────────────────────`);
-    for (const { k, st, s } of mk) console.log(`  ${k.padEnd(22)} ${`${s.won}/${st}`.padStart(9)} ${pct(s.won, st).padStart(7)} ${roi(s).padStart(8)}`);
-  }
+  console.log(line);
+  console.log(`  ${'GESAMT'.padEnd(22)} ${`${twon}/${tsettled}`.padStart(9)} ${pct(twon, tsettled).padStart(7)} ${signed(tprofit).padStart(9)} ${(tsettled ? signed(100 * tprofit / tsettled) + '%' : '–').padStart(8)}`);
   console.log(line + '\n');
-  db.close();
 }
 
-// --- list -------------------------------------------------------------------
-function list(args) {
-  const db = openDb();
+function list(db, args) {
   const src = args.includes('--source') ? args[args.indexOf('--source') + 1] : null;
   const date = args.includes('--date') ? args[args.indexOf('--date') + 1] : null;
   const pending = args.includes('--pending');
-  let rows = db.prepare('SELECT * FROM tips ORDER BY match_date DESC, source').all();
-  if (src) rows = rows.filter((t) => t.source === src);
-  if (date) rows = rows.filter((t) => t.match_date === date);
-  if (pending) rows = rows.filter((t) => !t.result || t.result === 'pending');
-  for (const t of rows) {
-    const sc = t.ft_home != null ? ` (${t.ft_home}-${t.ft_away})` : '';
-    const res = t.result || 'pending';
-    console.log(`[${t.match_date}] ${t.source.padEnd(20)} ${t.home} vs ${t.away}${sc} · ` +
-      `${t.market_raw || '?'}${t.odds ? ' @' + t.odds : ''} · ${res}`);
+  let rows = db.prepare(`
+    SELECT s.key AS src, m.home_team AS home, m.away_team AS away, m.match_date, m.kickoff,
+      m.home_goals AS fh, m.away_goals AS fa, t.market_code, t.selection, t.odds,
+      st.result FROM tips t
+    JOIN sources s ON s.id=t.source_id
+    LEFT JOIN matches m ON m.id=t.match_id
+    LEFT JOIN settlements st ON st.tip_id=t.id
+    ORDER BY m.match_date DESC, m.kickoff, s.key`).all();
+  if (src) rows = rows.filter((r) => r.src === src);
+  if (date) rows = rows.filter((r) => r.match_date === date);
+  if (pending) rows = rows.filter((r) => !r.result);
+  for (const r of rows) {
+    const sc = r.fh != null ? ` (${r.fh}-${r.fa})` : '';
+    const lbl = r.market_code ? marketLabel(r.market_code) : (r.selection || '?');
+    console.log(`[${deDate(r.match_date)}] ${r.src.padEnd(20)} ${r.home} vs ${r.away}${sc} · ${lbl}${r.odds ? ' @' + r.odds : ''} · ${r.result || 'pending'}`);
   }
   if (!rows.length) console.log('Keine Einträge.');
-  db.close();
 }
 
 function sources() {
   console.log('Verfügbare Quellen:');
-  for (const a of ADAPTERS) console.log(`  ${a.id.padEnd(22)} ${a.name}\n  ${' '.repeat(22)} ${a.url}`);
+  for (const a of ADAPTERS) console.log(`  ${a.id.padEnd(22)} ${a.name}`);
 }
 
-// --- dispatch ---------------------------------------------------------------
 const [cmd, ...args] = process.argv.slice(2);
+const db = openDb();
 try {
   switch (cmd) {
     case undefined:
-    case 'collect': await collect(args[0]); break;
-    case 'prefetch': await prefetchBetmonitor(); console.log('Betmonitor gecacht.'); break;
-    case 'odds': await fillOdds(); break;
-    case 'results': await results(); break;
-    case 'kickoff': await fillKickoff(); break;
-    case 'update': await collect(args[0]); await fillOdds(); await results(); break;
-    case 'report': report(); break;
-    case 'list': list(args); break;
+    case 'daily':   await daily(db, args[0]); break;
+    case 'collect': await collect(db, args[0]); break;
+    case 'enrich':  await enrich(db); break;
+    case 'settle':  settle(db); break;
+    case 'odds':    await fillOdds(db); break;
+    case 'prune':   prune(db, {}); break;
+    case 'report':  report(db); break;
+    case 'list':    list(db, args); break;
     case 'sources': sources(); break;
-    default: console.log('Befehle: collect | kickoff | odds | results | update | report | list | sources');
+    default: console.log('Befehle: daily | collect | enrich | settle | odds | prune | report | list | sources');
   }
-} catch (e) { console.error('Fehler:', e.message); process.exit(1); }
+} catch (e) { console.error('Fehler:', e.message); process.exitCode = 1; }
+finally { db.close(); }
