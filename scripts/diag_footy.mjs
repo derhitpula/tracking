@@ -18,8 +18,10 @@ const g = tip?.meta?.grid?.[0];
 console.log('grid keys    :', Object.keys(g || {}).join(','));
 console.log('grid.selection:', JSON.stringify(g?.selection));
 console.log('grid.match keys:', Object.keys(g?.match || {}).join(','));
-// Bookmaker-Struktur des ersten Tipps
-console.log('bestOdds     :', JSON.stringify(tip?.meta?.bestOdds));
-console.log('bookmakers[0]:', JSON.stringify(tip?.meta?.bookmakers?.[0]));
-console.log('bookmakers[1]:', JSON.stringify(tip?.meta?.bookmakers?.[1]));
-console.log('selectedBM   :', JSON.stringify(tip?.meta?.selectedBookmakers));
+// Wo sitzen die oddsDecimal-Werte? Kontext der ersten Fundstelle dumpen.
+console.log('typeof bookmakers:', typeof tip?.meta?.bookmakers, Array.isArray(tip?.meta?.bookmakers) ? 'array' : '');
+console.log('bookmakers raw :', JSON.stringify(tip?.meta?.bookmakers)?.slice(0, 300));
+console.log('outcomes raw   :', JSON.stringify(tip?.outcomes)?.slice(0, 400));
+console.log('offer raw      :', JSON.stringify(tip?.offer)?.slice(0, 300));
+const oi = raw.indexOf('oddsDecimal');
+if (oi >= 0) console.log('oddsDecimal-Kontext:', raw.slice(oi - 120, oi + 60));
