@@ -18,6 +18,8 @@ const g = tip?.meta?.grid?.[0];
 console.log('grid keys    :', Object.keys(g || {}).join(','));
 console.log('grid.selection:', JSON.stringify(g?.selection));
 console.log('grid.match keys:', Object.keys(g?.match || {}).join(','));
-// Volltext-Suche nach "odds" Kontext
-const idx = raw.search(/odds?"/i);
-if (idx >= 0) console.log('odds-Kontext :', raw.slice(idx - 40, idx + 80));
+// Bookmaker-Struktur des ersten Tipps
+console.log('bestOdds     :', JSON.stringify(tip?.meta?.bestOdds));
+console.log('bookmakers[0]:', JSON.stringify(tip?.meta?.bookmakers?.[0]));
+console.log('bookmakers[1]:', JSON.stringify(tip?.meta?.bookmakers?.[1]));
+console.log('selectedBM   :', JSON.stringify(tip?.meta?.selectedBookmakers));
