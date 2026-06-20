@@ -61,6 +61,7 @@ async function resultsLoop() {
   for (;;) {
     await new Promise((r) => setTimeout(r, RESULTS_EVERY));
     await run('enrich');
+    await run('closing');
     await run('settle');
   }
 }

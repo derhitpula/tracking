@@ -48,24 +48,33 @@ const oddCell = (r) => (r.ref_odds != null
   : (r.odds != null ? `<span class="odd">${r.odds}</span>` : '<span class="muted">–</span>'));
 
 // --- Aggregation -------------------------------------------------------------
+// CLV (Closing Line Value) eines Tipps in %: wie viel besser war die gespielte
+// Quote gegenüber der Marktschlussquote. >0 = Value.
+const clvOf = (r) => (r.odds && r.closing_odds ? (r.odds / r.closing_odds - 1) * 100 : null);
+
 function aggregate(rows) {
   const by = new Map();
-  const all = { won: 0, lost: 0, void: 0, pending: 0, profit: 0 };
+  const all = { won: 0, lost: 0, void: 0, pending: 0, profit: 0, clvSum: 0, clvN: 0 };
   for (const r of rows) {
     const k = r.result || 'pending';
-    const s = by.get(r.source) || { won: 0, lost: 0, void: 0, pending: 0, profit: 0 };
+    const s = by.get(r.source) || { won: 0, lost: 0, void: 0, pending: 0, profit: 0, clvSum: 0, clvN: 0 };
     s[k]++; all[k]++;
     s.profit += r.profit || 0; all.profit += r.profit || 0;
+    const c = clvOf(r);
+    if (c != null) { s.clvSum += c; s.clvN++; all.clvSum += c; all.clvN++; }
     by.set(r.source, s);
   }
   return { all, by };
 }
 const roi = (s) => { const st = s.won + s.lost; return st ? signed(100 * s.profit / st) + '%' : '–'; };
 const roiCls = (s) => { const st = s.won + s.lost; return !st ? 'muted' : s.profit > 0 ? 'pos' : s.profit < 0 ? 'neg' : ''; };
+const clvAvg = (s) => (s.clvN ? signed(s.clvSum / s.clvN) + '%' : '–');
+const clvCls = (s) => (!s.clvN ? 'muted' : s.clvSum > 0 ? 'pos' : s.clvSum < 0 ? 'neg' : '');
 
 function statRow(name, s) {
   return `<tr><td>${srcBadge(name)}</td><td>${bar(s.won, s.lost)}</td>` +
     `<td>${pct(s.won, s.won + s.lost)}</td><td class="${roiCls(s)}">${roi(s)}</td>` +
+    `<td class="${clvCls(s)}">${clvAvg(s)}</td>` +
     `<td><span class="pill pending sm">${s.pending}</span></td></tr>`;
 }
 
@@ -167,9 +176,9 @@ function mainHtml(db) {
   const body = `<div class="cards">
     <div class="card"><div class="v">${all.won}<span class="muted" style="font-size:16px">/${all.won + all.lost}</span></div><div class="l">Treffer · ${pct(all.won, all.won + all.lost)}</div></div>
     <div class="card ${roiCardCls}"><div class="v">${roi(all)}</div><div class="l">ROI (1u je Wette)</div></div>
-    <div class="card"><div class="v">${settled}</div><div class="l">abgerechnet</div></div>
+    <div class="card ${clvCls(all)}"><div class="v">${clvAvg(all)}</div><div class="l">Ø CLV (Value)</div></div>
     <div class="card"><div class="v" style="color:var(--amber)">${all.pending}</div><div class="l">offen</div></div></div>
-    <h2>Nach Quelle</h2><div class="scroll"><table><thead><tr><th>Quelle</th><th>Trefferquote</th><th>Quote</th><th>ROI</th><th>offen</th></tr></thead><tbody>${srcRows}</tbody></table></div>
+    <h2>Nach Quelle</h2><div class="scroll"><table><thead><tr><th>Quelle</th><th>Trefferquote</th><th>Quote</th><th>ROI</th><th>CLV</th><th>offen</th></tr></thead><tbody>${srcRows}</tbody></table></div>
     ${comboRows ? `<h2>Kombis</h2><div class="scroll"><table><thead><tr><th>Datum</th><th>Quelle</th><th>Typ</th><th>Legs</th><th>Quote</th><th>Ergebnis</th></tr></thead><tbody>${comboRows}</tbody></table></div>` : ''}
     <h2>Einzeltipps</h2><div class="scroll"><table><thead><tr><th>Datum</th><th>Quelle</th><th>Spiel</th><th>Tipp</th><th>Quote (Ref)</th><th>Ergebnis</th></tr></thead><tbody>${singles}</tbody></table></div>
     <footer>ROI auf Basis einheitlicher Referenzquote (API-Football · Bet365) je Spiel + Markt; Eigenquote in Klammern.<br>Auto-Refresh alle 5 Min · nur zu Analysezwecken.</footer>`;
