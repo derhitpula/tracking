@@ -18,7 +18,7 @@ const rows = db.prepare(`
   SELECT t.id, t.market_code, t.odds, t.ref_odds, m.home_team, m.away_team,
          m.home_goals fh, m.away_goals fa, m.ht_home hh, m.ht_away ha, m.status
   FROM tips t JOIN matches m ON m.id=t.match_id JOIN sources s ON s.id=t.source_id
-  WHERE s.name=? AND (m.home_team LIKE ? OR m.away_team LIKE ?)`)
+  WHERE s.key=? AND (m.home_team LIKE ? OR m.away_team LIKE ?)`)
   .all(source, `%${team}%`, `%${team}%`);
 
 if (!rows.length) { console.log('Kein passender Tipp gefunden.'); db.close(); process.exit(0); }
