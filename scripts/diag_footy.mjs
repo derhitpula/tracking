@@ -18,10 +18,23 @@ const g = tip?.meta?.grid?.[0];
 console.log('grid keys    :', Object.keys(g || {}).join(','));
 console.log('grid.selection:', JSON.stringify(g?.selection));
 console.log('grid.match keys:', Object.keys(g?.match || {}).join(','));
-// Wo sitzen die oddsDecimal-Werte? Kontext der ersten Fundstelle dumpen.
-console.log('typeof bookmakers:', typeof tip?.meta?.bookmakers, Array.isArray(tip?.meta?.bookmakers) ? 'array' : '');
-console.log('bookmakers raw :', JSON.stringify(tip?.meta?.bookmakers)?.slice(0, 300));
-console.log('outcomes raw   :', JSON.stringify(tip?.outcomes)?.slice(0, 400));
-console.log('offer raw      :', JSON.stringify(tip?.offer)?.slice(0, 300));
-const oi = raw.indexOf('oddsDecimal');
-if (oi >= 0) console.log('oddsDecimal-Kontext:', raw.slice(oi - 120, oi + 60));
+// Rekursiv den Pfad zum ersten Objekt mit "oddsDecimal" finden.
+function findPath(obj, key, path = '') {
+  if (obj && typeof obj === 'object') {
+    if (Object.prototype.hasOwnProperty.call(obj, key)) return path;
+    for (const k of Object.keys(obj)) {
+      const r = findPath(obj[k], key, `${path}.${Array.isArray(obj) ? '[' + k + ']' : k}`);
+      if (r !== null) return r;
+    }
+  }
+  return null;
+}
+const p = findPath(tip, 'oddsDecimal');
+console.log('Pfad zu oddsDecimal (ab tip):', p);
+// Parent-Objekt holen
+let node = tip;
+for (const seg of p.split('.').filter(Boolean)) {
+  const m = seg.match(/^\[(\d+)\]$/);
+  node = m ? node[Number(m[1])] : node[seg];
+}
+console.log('Bookmaker-Eintrag:', JSON.stringify(node).slice(0, 300));
