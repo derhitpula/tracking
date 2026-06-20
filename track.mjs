@@ -15,6 +15,7 @@ import './lib/env.mjs';
 import { openDb } from './lib/db.mjs';
 import { collect, enrich, settle, fillOdds, prune, daily } from './lib/pipeline.mjs';
 import { marketLabel } from './lib/markets.mjs';
+import { prefetchToday } from './lib/betmonitor.mjs';
 import { ADAPTERS } from './adapters/index.mjs';
 
 const pct = (n, d) => (d ? `${(100 * n / d).toFixed(1)}%` : '–');
@@ -89,6 +90,7 @@ try {
     case 'settle':  settle(db); break;
     case 'odds':    await fillOdds(db); break;
     case 'prune':   prune(db, {}); break;
+    case 'prefetch': await prefetchToday(); console.log('Betmonitor gecacht.'); break;
     case 'report':  report(db); break;
     case 'list':    list(db, args); break;
     case 'sources': sources(); break;

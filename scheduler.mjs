@@ -24,11 +24,7 @@ function run(cmd) {
   });
 }
 
-async function loop(cmd, every) {
-  for (;;) { await run(cmd); await new Promise((r) => setTimeout(r, every)); }
-}
-
-console.log(`[${ts()}] Scheduler gestartet · collect alle ${COLLECT_EVERY / H}h · results alle ${RESULTS_EVERY / H}h`);
+console.log(`[${ts()}] Scheduler gestartet · daily alle ${COLLECT_EVERY / H}h · enrich+settle alle ${RESULTS_EVERY / H}h`);
 console.log(`[${ts()}] API-Football-Key: ${process.env.APIFOOTBALL_KEY ? 'gesetzt' : 'FEHLT (nur TheSportsDB-Fallback)'}`);
 
 // Dashboard standardmäßig AUS (headless). Mit ENABLE_DASHBOARD=true einschaltbar.
@@ -53,13 +49,20 @@ function scheduleMidnightPrefetch() {
 }
 scheduleMidnightPrefetch();
 
-// collect → odds immer direkt hintereinander; results läuft unabhängig häufiger.
-async function collectLoop() {
+// Voller Tagesablauf (collect+prune+enrich+odds+settle) periodisch;
+// Endstände zusätzlich häufiger nachziehen (enrich+settle).
+async function dailyLoop() {
   for (;;) {
-    await run('collect');
-    await run('odds');
+    await run('daily');
     await new Promise((r) => setTimeout(r, COLLECT_EVERY));
   }
 }
-collectLoop();
-setTimeout(() => loop('results', RESULTS_EVERY), 60 * 1000);
+async function resultsLoop() {
+  for (;;) {
+    await new Promise((r) => setTimeout(r, RESULTS_EVERY));
+    await run('enrich');
+    await run('settle');
+  }
+}
+dailyLoop();
+setTimeout(resultsLoop, 60 * 1000);
