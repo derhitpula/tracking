@@ -16,7 +16,10 @@ export default {
       const teams = splitTeams(names[i]); if (!teams) continue;
       const pick = picks[i];
       const odds = parseOdds(pick);
-      const market_raw = pick.replace(/\s*\(.*?\)\s*/g, '').replace(/\d+\.\d+/, '').trim();
+      let market_raw = pick.replace(/\s*\(.*?\)\s*/g, '').replace(/\d+\.\d+/, '').trim();
+      // "Yes" / "No" allein = BTTS (freetips zeigt Markt-Label separat)
+      if (/^yes$/i.test(market_raw)) market_raw = 'BTTS - Yes';
+      if (/^no$/i.test(market_raw)) market_raw = 'BTTS - No';
       const dt = parseDayMonth(dates[i]); // echtes Spieldatum, falls vorhanden
       tips.push({ ...teams, market_raw, odds, match_date: dt?.date, kickoff: dt?.kickoff,
         slip_type: names.length > 1 ? 'acca' : 'single' });
