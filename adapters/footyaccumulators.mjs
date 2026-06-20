@@ -3,8 +3,18 @@
 // Pfad: widgets[component='Tipster'].data.tips[].meta.grid[]
 //   grid.match.team_a_name / team_b_name / date_iso
 //   grid.selection.headline (voller Tipp, z. B. "Germany Win & Over 2.5")
-//   tip.meta.bestOdds = Gesamtquote (fractional, z. B. "5/4") – Quote des Tipps.
-import { parseOdds } from '../lib/parse.mjs';
+//   tip.outcomes.odds[] = Bookmaker-Quoten {bookmaker, oddsDecimal, odds}.
+//   bestOdds (tip.meta) ist gerundet/ungenau -> echte Quote aus outcomes.odds.
+
+// Quote des Tipps: Bet365 bevorzugt (= unsere Referenz), sonst beste verfügbare.
+function tipOdds(tip) {
+  const offers = tip?.outcomes?.odds;
+  if (!Array.isArray(offers) || !offers.length) return null;
+  const bet365 = offers.find((o) => o.bookmaker === 'bet365' && o.oddsDecimal > 0);
+  if (bet365) return Number(bet365.oddsDecimal);
+  const best = offers.reduce((m, o) => (o.oddsDecimal > (m?.oddsDecimal || 0) ? o : m), null);
+  return best?.oddsDecimal ? Number(best.oddsDecimal) : null;
+}
 
 export default {
   id: 'footyaccumulators',
@@ -19,10 +29,8 @@ export default {
       const widgets = j?.props?.pageProps?.page?.meta?.widgets || [];
       const tipster = widgets.find((w) => w.component === 'Tipster');
       for (const tip of (tipster?.data?.tips || [])) {
-        // Gesamtquote des Tipps (fractional -> dezimal). Gilt je grid-Markt;
-        // footyaccumulators-BOTD ist praktisch immer ein einzelner (ggf.
-        // kombinierter) Markt pro Tipp.
-        const odds = tip?.meta?.bestOdds ? parseOdds(tip.meta.bestOdds) : null;
+        // Quote des Tipps (Bet365, sonst beste). Fallback: gerundete bestOdds.
+        const odds = tipOdds(tip) ?? (tip?.meta?.bestOdds ? parseOdds(tip.meta.bestOdds) : null);
         for (const g of (tip?.meta?.grid || [])) {
           const m = g.match;
           if (!m || m.sportType !== 'football') continue;
