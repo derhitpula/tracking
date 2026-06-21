@@ -151,7 +151,7 @@ function mainHtml(db) {
   // Kombis nach slip_ref gruppieren
   const comboMap = new Map();
   for (const r of rows) if (r.slip_ref) (comboMap.get(r.slip_ref) || comboMap.set(r.slip_ref, []).get(r.slip_ref)).push(r);
-  const comboRows = [...comboMap.values()].map((legs) => {
+  const comboRows = [...comboMap.values()].sort((a, b) => byKickoff(a[0], b[0])).map((legs) => {
     const res = legs.some((l) => l.result === 'lost') ? 'lost' : legs.every((l) => l.result === 'won') ? 'won' : 'pending';
     const l0 = legs[0];
     const legsHtml = legs.map((l) => `<span class="leg">${esc(l.home)} / ${esc(l.away)} · <b>${label(l)}</b></span>`).join('<span class="plus">+</span>');
