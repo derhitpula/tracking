@@ -79,8 +79,8 @@ function statRow(name, s) {
 }
 
 // chronologisch: Datum + Anstoß aufsteigend, NULL-Kickoff ans Ende
-const byKickoff = (a, b) => String(a.match_date).localeCompare(String(b.match_date)) ||
-  (a.kickoff ? 1 : 0) - (b.kickoff ? 1 : 0) || String(a.kickoff).localeCompare(String(b.kickoff));
+const byKickoff = (a, b) => String(b.match_date).localeCompare(String(a.match_date)) ||
+  (b.kickoff ? 1 : 0) - (a.kickoff ? 1 : 0) || String(b.kickoff).localeCompare(String(a.kickoff));
 
 // --- gemeinsames CSS ---------------------------------------------------------
 const CSS = `:root{--bg:#04140d;--bg2:#061b12;--panel:#082318;--panel2:#0b3122;--line:#13402d;
